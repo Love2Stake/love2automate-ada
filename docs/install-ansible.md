@@ -32,6 +32,16 @@ This guide explains how to install Ansible on Ubuntu systems in the simplest way
    ansible --version
    ```
 
+## Navigating to the Playbook Directory
+
+Before running any playbooks, make sure you're in the correct directory where the playbooks are located:
+
+```bash
+cd $HOME/git/love2automate-ada
+```
+
+This repository contains all the necessary Ansible playbooks for installing and uninstalling Cardano Node.
+
 ## That's It!
 
 You now have Ansible installed and ready to use for running the Cardano Node installation playbooks.

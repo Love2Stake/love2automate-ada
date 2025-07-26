@@ -16,7 +16,7 @@ This repository contains Ansible playbooks for installing and uninstalling a Car
 ## Documentation
 
 - [Installing Ansible](docs/install-ansible.md)
-- [Installing Cardano Node](docs/install-cardano-node.md) (Coming soon)
+- [Installing Cardano Node](docs/install-cardano-node.md)
 - [Uninstalling Cardano Node](docs/uninstall-cardano-node.md)
 
 ## Prerequisites
@@ -27,6 +27,12 @@ This repository contains Ansible playbooks for installing and uninstalling a Car
 - Internet connection
 
 ## Quick Start
+
+First, navigate to the repository directory:
+
+```bash
+cd $HOME/git/love2automate-ada
+```
 
 ### Installation
 

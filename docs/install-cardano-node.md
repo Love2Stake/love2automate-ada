@@ -20,9 +20,10 @@ Before running the installation process, ensure you have:
 
 ## Installation Process
 
-To install the Cardano Node and all related components, run the following command from the repository root:
+To install the Cardano Node and all related components, navigate to the playbook directory and run:
 
 ```bash
+cd $HOME/git/love2automate-ada
 ansible-playbook Build.yml -i inventory.ini -c local --ask-become-pass
 ```
 

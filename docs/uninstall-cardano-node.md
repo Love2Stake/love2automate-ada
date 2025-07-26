@@ -19,9 +19,10 @@ Before running the uninstall process, ensure you have:
 
 ## Uninstall Process
 
-To uninstall the Cardano Node and all related components, run the following command from the repository root:
+To uninstall the Cardano Node and all related components, navigate to the playbook directory and run:
 
 ```bash
+cd $HOME/git/love2automate-ada
 ansible-playbook Uninstall.yml -i inventory.ini -c local --ask-become-pass
 ```
 
