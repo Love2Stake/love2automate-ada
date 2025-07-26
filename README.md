@@ -15,6 +15,7 @@ This repository contains Ansible playbooks for installing and uninstalling a Car
 
 ## Documentation
 
+- [Installing Ansible](docs/install-ansible.md)
 - [Installing Cardano Node](docs/install-cardano-node.md) (Coming soon)
 - [Uninstalling Cardano Node](docs/uninstall-cardano-node.md)
 
