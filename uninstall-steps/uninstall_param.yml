@@ -18,6 +18,9 @@ secp256k1_version: "v0.3.2"
 blst_version: "v0.3.0"
 #################################################################
 # Cardano Node version to ins.  Remove comment and specify the version.  Check all other pre-requisites before uncommenting.
+
+# Cardano node directory name
+cardano_node_dir: "cardano-my-node"
 cardano_node_version: "10.5.1"
 
 # Install method build or download
