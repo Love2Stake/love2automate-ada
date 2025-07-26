@@ -18,7 +18,7 @@ secp256k1_version: "v0.3.2"
 blst_version: "v0.3.0"
 ################################################################
 # Cardano Node version.  Remove comment and specify the version.  Check all other pre-requisites before uncommenting.
-#cardano_node_version: "10.4.1"
+cardano_node_version: "10.5.1"
 
 # Install method build or download
 install_method: "download" # Options: build or download
