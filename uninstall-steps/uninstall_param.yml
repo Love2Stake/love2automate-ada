@@ -1,0 +1,24 @@
+# Setting home directory for the user
+user_home: "/home/danu"
+# Log file for shell command output
+log_file: "{{ user_home }}/ansible-install.log"
+# Setting timezone
+timezone_setting: Europe/London
+
+#################################################################
+# GHC version
+ghc_version: "9.2.7"
+# Cabal version
+cabal_version: "3.12.1.0"
+# libsodium version
+libsodium_version: "dbb48cc"
+# secp256k1 version
+secp256k1_version: "v0.3.2"
+# blst version
+blst_version: "v0.3.0"
+#################################################################
+# Cardano Node version to ins.  Remove comment and specify the version.  Check all other pre-requisites before uncommenting.
+cardano_node_version: "10.5.1"
+
+# Install method build or download
+install_method: "download" # Options: build or download

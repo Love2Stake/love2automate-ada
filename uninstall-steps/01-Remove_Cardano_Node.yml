@@ -1,0 +1,54 @@
+- name: Remove_Cardano_Node
+  hosts: localhost
+  vars_files:
+    - uninstall_param.yml
+
+  tasks:
+    # - name: DEBUG user_home
+    #   debug:
+    #     var: user_home
+
+    - name: Remove Cardano node binary from /usr/local/bin
+      become: yes
+      file:
+        path: /usr/local/bin/cardano-node
+        state: absent
+
+    - name: Remove Cardano CLI binary from /usr/local/bin
+      become: yes
+      file:
+        path: /usr/local/bin/cardano-cli
+        state: absent
+
+    - name: Check if extracted cardano-node binary archive exists
+      stat:
+        path: "{{ user_home }}/git/cardano-node-{{ cardano_node_version }}-linux.tar.gz"
+      register: cardano_binary_archive
+
+    - name: Remove extracted cardano-node binary archive
+      file:
+        path: "{{ user_home }}/git/cardano-node-{{ cardano_node_version }}-linux.tar.gz"
+        state: absent
+      when: cardano_binary_archive.stat.exists
+
+    - name: Remove cardano-binary directory
+      file:
+        path: "{{ user_home }}/git/cardano-binary"
+        state: absent
+
+    - name: Check if cardano-my-node exists
+      stat:
+        path: "{{ user_home }}/cardano-my-node"
+      register: my_node_check
+
+    - name: Remove cardano-my-node directory
+      file:
+        path: "{{ user_home }}/cardano-my-node"
+        state: absent
+
+    - name: Remove cloned cardano-node git repo
+      file:
+        path: "{{ user_home }}/git/cardano-node"
+        state: absent
+
+    # You might want to remove other dependencies/packages if your install added them.

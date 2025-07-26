@@ -1,0 +1,59 @@
+- name: 03-GHCup_Install
+  hosts: localhost
+  vars_files:
+    - ../install_param.yml
+  
+  tasks:
+    - name: Install GHCup non-interactively
+      shell: |
+        curl --proto '=https' --tlsv1.2 -sSf https://get-ghcup.haskell.org | BOOTSTRAP_HASKELL_NONINTERACTIVE=1 sh >> {{ log_file }} 2>&1
+      args:
+        executable: /bin/bash
+        creates: "{{ user_home }}/.ghcup"
+
+    - name: Get GHCup version
+      shell: "{{ user_home }}/.ghcup/bin/ghcup --version"
+      register: ghcup_version_output
+      changed_when: false
+
+    - name: Display GHCup version
+      debug:
+        msg: "{{ ghcup_version_output.stdout }}"
+      become: false
+
+    - name: Install GHC
+      shell: "{{ user_home }}/.ghcup/bin/ghcup install ghc {{ ghc_version }} >> {{ log_file }} 2>&1"
+      args:
+        executable: /bin/bash
+
+    - name: Set GHC as default
+      shell: "{{ user_home }}/.ghcup/bin/ghcup set ghc {{ ghc_version }} >> {{ log_file }} 2>&1"
+      args:
+        executable: /bin/bash
+
+    - name: Display GHC version after setting default
+      shell: "{{ user_home }}/.ghcup/bin/ghc --version"
+      register: ghc_version_output
+      changed_when: false
+
+    - name: Show GHC version in log
+      debug:
+        msg: "{{ ghc_version_output.stdout }}"
+
+    - name: Install Cabal
+      shell: "{{ user_home }}/.ghcup/bin/ghcup install cabal {{ cabal_version }} >> {{ log_file }} 2>&1"
+      args:
+        executable: /bin/bash
+
+    - name: Set Cabal as default
+      shell: "{{ user_home }}/.ghcup/bin/ghcup set cabal {{ cabal_version }} >> {{ log_file }} 2>&1"
+      args:
+        executable: /bin/bash
+    - name: Display Cabal version after setting default
+      shell: "{{ user_home }}/.ghcup/bin/cabal --version"
+      register: cabal_version_output
+      changed_when: false
+
+    - name: Show Cabal version in log
+      debug:
+        msg: "{{ cabal_version_output.stdout }}"

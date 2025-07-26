@@ -1,0 +1,80 @@
+- name: 01-Chrony_Setup
+  hosts: localhost
+  become: yes
+  vars_files:
+    - ../install_param.yml
+
+  tasks:
+    - name: Update and upgrade APT packages
+      apt:
+        update_cache: yes
+        upgrade: dist
+        autoremove: yes
+        autoclean: yes
+
+    - name: Install chrony
+      apt:
+        name: chrony
+        state: present
+
+    - name: Backup existing chrony.conf
+      copy:
+        src: /etc/chrony/chrony.conf
+        dest: /etc/chrony/chrony.conf.bak
+        remote_src: yes
+      ignore_errors: yes
+
+    - name: Configure chrony
+      copy:
+        dest: /etc/chrony/chrony.conf
+        content: |
+          pool time.google.com       iburst minpoll 1 maxpoll 2 maxdelay 0.3 maxsources 3
+          pool ntp.ubuntu.com        iburst minpoll 1 maxpoll 2 maxdelay 0.3 maxsources 3
+          pool us.pool.ntp.org       iburst minpoll 1 maxpoll 2 maxdelay 0.3 maxsources 3
+
+          keyfile /etc/chrony/chrony.keys
+          driftfile /var/lib/chrony/chrony.drift
+          #log tracking measurements statistics
+          logdir /var/log/chrony
+          maxupdateskew 5.0
+          rtcsync
+          makestep 0.1 -1
+      notify: Restart chrony
+
+    - name: Ensure chrony service is running and enabled
+      service:
+        name: chrony
+        state: started
+        enabled: yes
+
+    - name: Set timezone default to Europe/London
+      timezone:
+        name: "{{ timezone_setting | default('Europe/London') }}"
+
+    - name: Gather service facts
+      service_facts:
+
+    - name: Display chrony service status
+      debug:
+        msg: >-
+          Chrony service state: {{ ansible_facts.services['chrony.service'].state }}
+
+    - name: Display full chrony service info
+      debug:
+        var: ansible_facts.services['chrony.service']
+
+    - name: Display current system timezone
+      command: timedatectl show --property=Timezone --value
+      register: tz
+      changed_when: false
+
+    - name: Show system timezone
+      debug:
+        msg: "Current system timezone: {{ tz.stdout }}"
+
+  handlers:
+    - name: Restart chrony
+      service:
+        name: chrony
+        state: restarted
+        enabled: yes

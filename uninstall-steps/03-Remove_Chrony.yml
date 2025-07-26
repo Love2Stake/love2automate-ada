@@ -1,0 +1,35 @@
+- name: Remove Chrony and related files on Ubuntu
+  hosts: localhost
+  become: yes
+
+  tasks:
+    - name: Stop chrony service if running
+      service:
+        name: chrony
+        state: stopped
+      ignore_errors: yes
+
+    - name: Uninstall chrony package
+      apt:
+        name: chrony
+        state: absent
+        purge: yes  # Also removes configuration files managed by the package
+
+    - name: Remove chrony configuration directory
+      file:
+        path: /etc/chrony
+        state: absent
+
+    - name: Remove chrony log directory
+      file:
+        path: /var/log/chrony
+        state: absent
+
+    - name: Remove chrony drift file
+      file:
+        path: /var/lib/chrony
+        state: absent
+
+    - name: Display message
+      debug:
+        msg: "Chrony and all related files have been removed."

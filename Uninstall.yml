@@ -1,0 +1,3 @@
+- import_playbook: uninstall-steps/01-Remove_Cardano_Node.yml
+- import_playbook: uninstall-steps/02-Remove_Step1_to_Step7.yml
+- import_playbook: uninstall-steps/03-Remove_Chrony.yml

@@ -1,0 +1,160 @@
+- name: Setup Cardano Node
+  hosts: localhost
+  vars_files:
+    - ../install_param.yml
+
+  tasks:
+    - name: Ensure working directory exists
+      file:
+        path: "{{ user_home }}/git"
+        state: directory
+        mode: '0755'
+
+    - name: Remove libsodium-dev if present
+      apt:
+        name: libsodium-dev
+        state: absent
+
+    # ------------------------------
+    # Setting Cardano version
+    # ------------------------------        
+    - name: Get latest cardano-node release tag if not specified
+      shell: curl -s https://api.github.com/repos/IntersectMBO/cardano-node/releases/latest | jq -r .tag_name
+      register: latest_tag
+      changed_when: false
+      when: cardano_node_version is not defined
+
+    - name: Set cardano_node_version to latest tag if not specified
+      set_fact:
+        cardano_node_version: "{{ latest_tag.stdout }}"
+      when: cardano_node_version is not defined
+
+    - name: Show cardano-node version to be installed
+      debug:
+        msg: "Installing cardano-node version {{ cardano_node_version }}"
+
+
+    # ------------------------------
+    # Option 1: Download binaries
+    # ------------------------------
+    - name: Download Cardano node binary archive
+      when: install_method == "download"
+      get_url:
+        url: "https://github.com/IntersectMBO/cardano-node/releases/download/{{ cardano_node_version }}/cardano-node-{{ cardano_node_version }}-linux.tar.gz"
+        dest: "{{ user_home }}/git/cardano-node-{{ cardano_node_version }}-linux.tar.gz"
+        mode: '0644'
+        force: yes
+
+    - name: Ensure cardano-binary directory exists
+      file:
+        path: "{{ user_home }}/git/cardano-binary"
+        state: directory
+        mode: '0755'
+
+    - name: Extract downloaded binary archive
+      when: install_method == "download"
+      unarchive:
+        src: "{{ user_home }}/git/cardano-node-{{ cardano_node_version }}-linux.tar.gz"
+        dest: "{{ user_home }}/git/cardano-binary"
+        remote_src: yes
+
+    - name: Move binaries to /usr/local/bin
+      when: install_method == "download"
+      become: yes
+      shell: |
+        mv {{ user_home }}/git/cardano-binary/bin/cardano-node /usr/local/bin/
+        mv {{ user_home }}/git/cardano-binary/bin/cardano-cli /usr/local/bin/
+      args:
+        executable: /bin/bash
+        creates: /usr/local/bin/cardano-node
+
+
+    # ------------------------------
+    # Option 2: Build from source
+    # ------------------------------
+    - block:
+        - name: Clone cardano-node repository
+          git:
+            repo: https://github.com/IntersectMBO/cardano-node.git
+            dest: "{{ user_home }}/git/cardano-node"
+            clone: yes
+            update: yes
+
+        - name: Fetch all tags
+          shell: git fetch --all --tags
+          args:
+            chdir: "{{ user_home }}/git/cardano-node"
+            executable: /bin/bash
+
+        - name: Init and update submodules
+          shell: git submodule update --init --recursive
+          args:
+            chdir: "{{ user_home }}/git/cardano-node"
+            executable: /bin/bash
+
+        - name: Checkout specified cardano-node release tag
+          shell: git checkout "{{ cardano_node_version }}"
+          args:
+            chdir: "{{ user_home }}/git/cardano-node"
+            executable: /bin/bash
+
+        - name: Cabal update
+          shell: cabal update
+          args:
+            chdir: "{{ user_home }}/git/cardano-node"
+            executable: /bin/bash
+
+        - name: Cabal configure for build
+          shell: cabal configure -O0 -w ghc-{{ ghc_version }}
+          args:
+            chdir: "{{ user_home }}/git/cardano-node"
+            executable: /bin/bash
+
+        - name: Cabal build all
+          shell: cabal build all
+          args:
+            chdir: "{{ user_home }}/git/cardano-node"
+            executable: /bin/bash
+
+        - name: Cabal build cardano-cli
+          shell: cabal build cardano-cli
+          args:
+            chdir: "{{ user_home }}/git/cardano-node"
+            executable: /bin/bash
+
+        - name: Copy cardano-node binary to /usr/local/bin
+          become: yes
+          shell: cp -p "$(./scripts/bin-path.sh cardano-node)" /usr/local/bin/cardano-node
+          args:
+            chdir: "{{ user_home }}/git/cardano-node"
+            executable: /bin/bash
+
+        - name: Copy cardano-cli binary to /usr/local/bin
+          become: yes
+          shell: cp -p "$(./scripts/bin-path.sh cardano-cli)" /usr/local/bin/cardano-cli
+          args:
+            chdir: "{{ user_home }}/git/cardano-node"
+            executable: /bin/bash
+
+      when: install_method == "build"
+
+    # ------------------------------
+    # Show installed versions
+    # ------------------------------
+    - name: Show cardano-node version
+      shell: cardano-node --version
+      register: cardano_node_version_output
+      changed_when: false
+
+    - name: Display cardano-node version
+      debug:
+        msg: "{{ cardano_node_version_output.stdout }}"
+
+    - name: Show cardano-cli version
+      shell: cardano-cli --version
+      register: cardano_cli_version_output
+      changed_when: false
+
+    - name: Display cardano-cli version
+      debug:
+        msg: "{{ cardano_cli_version_output.stdout }}"

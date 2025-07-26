@@ -1,0 +1,43 @@
+- name: 02-OS_Packages_Install
+  hosts: localhost
+  vars_files:
+    - ../install_param.yml
+  
+  tasks:
+    - name: Update and upgrade APT packages
+      apt:
+        update_cache: yes
+        upgrade: full
+        autoremove: yes
+        autoclean: yes
+      become: yes
+    
+    - name: Install required packages
+      apt:
+        name:
+          - autoconf
+          - automake
+          - build-essential
+          - curl
+          - g++
+          - git
+          - jq
+          - libffi-dev
+          - libgmp-dev
+          - libncursesw5
+          - libssl-dev
+          - libsystemd-dev
+          - libtinfo-dev
+          - libtool
+          - make
+          - pkg-config
+          - tmux
+          - wget
+          - zlib1g-dev
+          - liblmdb-dev
+        state: present
+      register: install_result
+      retries: 3
+      delay: 10
+      until: install_result is succeeded
+      become: yes      

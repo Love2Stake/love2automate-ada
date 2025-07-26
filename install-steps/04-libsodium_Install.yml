@@ -1,0 +1,32 @@
+- name: 04-libsodium_Install
+  hosts: localhost
+  vars_files:
+    - ../install_param.yml
+  
+  tasks:
+    - name: Ensure git directory exists
+      file:
+        path: "{{ user_home }}/git"
+        state: directory
+        mode: '0755'
+
+    - name: Clone libsodium
+      git:
+        repo: https://github.com/input-output-hk/libsodium
+        dest: "{{ user_home }}/git/libsodium"
+        version: "{{ libsodium_version }}"
+        force: yes
+
+    - name: Build libsodium
+      shell: |
+        ./autogen.sh && ./configure && make >> {{ log_file }} 2>&1
+      args:
+        chdir: "{{ user_home }}/git/libsodium"
+        executable: /bin/bash
+
+    - name: Install libsodium
+      shell: make install >> {{ log_file }} 2>&1
+      args:
+        chdir: "{{ user_home }}/git/libsodium"
+        executable: /bin/bash
+      become: yes
