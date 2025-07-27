@@ -1,0 +1,82 @@
+- name: 03-GHCup_Upgrade_and_GHC_Setup
+  hosts: localhost
+  vars_files:
+    - update_param.yml
+
+  tasks:
+    - name: Upgrade GHCup
+      command: ghcup upgrade
+      environment:
+        PATH: "{{ user_home }}/.ghcup/bin:{{ ansible_env.PATH }}"
+      register: ghcup_upgrade_output
+
+    - name: Display GHCup upgrade output
+      debug:
+        msg: "{{ ghcup_upgrade_output.stdout }}"
+
+    - name: Get upgraded GHCup version
+      command: ghcup --version
+      register: ghcup_version_output
+      changed_when: false
+
+    - name: Display GHCup version
+      debug:
+        msg: "GHCup version: {{ ghcup_version_output.stdout }}"
+
+    - name: Install GHC version {{ ghc_version }}
+      command: ghcup install ghc {{ ghc_version }}
+      environment:
+        PATH: "{{ user_home }}/.ghcup/bin:{{ ansible_env.PATH }}"
+      register: ghc_install_output
+
+    - name: Display GHC install output
+      debug:
+        msg: "{{ ghc_install_output.stdout }}"
+
+    - name: Set GHC {{ ghc_version }} as default
+      command: ghcup set ghc {{ ghc_version }}
+      environment:
+        PATH: "{{ user_home }}/.ghcup/bin:{{ ansible_env.PATH }}"
+      register: ghc_set_output
+
+    - name: Display GHC set output
+      debug:
+        msg: "{{ ghc_set_output.stdout }}"
+
+    - name: Check GHC version
+      command: ghc --version
+      environment:
+        PATH: "{{ user_home }}/.ghcup/bin:{{ ansible_env.PATH }}"
+      register: ghc_version_output
+      changed_when: false
+
+    - name: Display GHC version
+      debug:
+        msg: "GHC version: {{ ghc_version_output.stdout }}"
+
+    - name: Upgrade or install Cabal version {{ cabal_version }}
+      shell: |
+        ghcup install cabal {{ cabal_version }} >> {{ log_file }} 2>&1
+      args:
+        executable: /bin/bash
+      environment:
+        PATH: "{{ user_home }}/.ghcup/bin:{{ ansible_env.PATH }}"
+
+    - name: Set Cabal {{ cabal_version }} as default
+      shell: |
+        ghcup set cabal {{ cabal_version }} >> {{ log_file }} 2>&1
+      args:
+        executable: /bin/bash
+      environment:
+        PATH: "{{ user_home }}/.ghcup/bin:{{ ansible_env.PATH }}"
+
+    - name: Check Cabal version
+      command: cabal --version
+      environment:
+        PATH: "{{ user_home }}/.ghcup/bin:{{ ansible_env.PATH }}"
+      register: cabal_version_output
+      changed_when: false
+
+    - name: Display Cabal version
+      debug:
+        msg: "Cabal version: {{ cabal_version_output.stdout }}"

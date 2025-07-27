@@ -1,0 +1,44 @@
+- name: 05-secp256k1_Install
+  hosts: localhost
+  vars_files:
+    - ../install_param.yml
+
+  tasks:
+    - name: Ensure git directory exists
+      file:
+        path: "{{ user_home }}/git"
+        state: directory
+        mode: '0755'
+
+    - name: Remove existing secp256k1 directory if present
+      file:
+        path: "{{ user_home }}/git/secp256k1"
+        state: absent
+
+    - name: Clone secp256k1
+      git:
+        repo: https://github.com/bitcoin-core/secp256k1
+        dest: "{{ user_home }}/git/secp256k1"
+        version: "{{ secp256k1_version }}"
+        depth: 1
+
+    - name: Build secp256k1
+      shell: |
+        ./autogen.sh
+        ./configure --enable-module-schnorrsig --enable-experimental
+        make
+        make check
+      args:
+        chdir: "{{ user_home }}/git/secp256k1"
+        executable: /bin/bash
+
+    - name: Install secp256k1
+      shell: make install >> {{ log_file }} 2>&1
+      args:
+        chdir: "{{ user_home }}/git/secp256k1"
+        executable: /bin/bash
+      become: yes
+
+    - name: Run ldconfig for secp256k1
+      shell: ldconfig
+      become: yes
