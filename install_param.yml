@@ -3,9 +3,9 @@
 
 # User details
 # Setting username for the user
-username: "danu"
+username: "{{ ansible_user | default(ansible_env.USER) }}"
 # Setting home directory for the user
-user_home: "/home/danu"
+user_home: "/home/{{ username }}"
 # Log file for shell command output
 log_file: "{{ user_home }}/ansible-install.log"
 # Setting timezone
