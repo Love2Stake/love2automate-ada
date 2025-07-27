@@ -58,6 +58,26 @@
         dest: "{{ user_home }}/git/cardano-binary"
         remote_src: yes
 
+    - name: Check if cardano service exists
+      stat:
+        path: /etc/systemd/system/cardano-node.service
+      register: service_status
+      become: yes
+
+    - name: Check if cardano service is running
+      shell: systemctl is-active cardano-node.service
+      register: service_running
+      ignore_errors: yes
+      become: yes
+      when: service_status.stat.exists
+
+    - name: Stop cardano service if running
+      systemd:
+        name: cardano-node
+        state: stopped
+      become: yes
+      when: service_status.stat.exists and service_running.rc == 0
+
     - name: Move binaries to /usr/local/bin
       when: install_method == "download"
       become: yes

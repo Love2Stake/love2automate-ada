@@ -1,0 +1,93 @@
+---
+- name: Sample Playbook with Parameter File
+  hosts: localhost
+  vars_files:
+    - playbook_params.yml
+  
+  tasks:
+    - name: Display user information
+      debug:
+        msg: "Running playbook for user {{ ansible_user }} with home directory {{ user_home }}"
+
+    - name: Create installation directory
+      file:
+        path: "{{ install_dir }}"
+        state: directory
+        mode: '0755'
+        owner: "{{ ansible_user }}"
+
+    - name: Install GHCup non-interactively
+      shell: |
+        curl --proto '=https' --tlsv1.2 -sSf https://get-ghcup.haskell.org | BOOTSTRAP_HASKELL_NONINTERACTIVE=1 sh >> {{ log_file }} 2>&1
+      args:
+        executable: /bin/bash
+        creates: "{{ user_home }}/.ghcup"
+      become: false
+
+    - name: Get GHCup version
+      shell: "{{ user_home }}/.ghcup/bin/ghcup --version"
+      register: ghcup_version_output
+      changed_when: false
+
+    - name: Display GHCup version
+      debug:
+        msg: "GHCup version: {{ ghcup_version_output.stdout }}"
+
+    - name: Install GHC
+      shell: "{{ user_home }}/.ghcup/bin/ghcup install ghc {{ ghc_version }} >> {{ log_file }} 2>&1"
+      args:
+        executable: /bin/bash
+      become: false
+
+    - name: Set GHC as default
+      shell: "{{ user_home }}/.ghcup/bin/ghcup set ghc {{ ghc_version }} >> {{ log_file }} 2>&1"
+      args:
+        executable: /bin/bash
+      become: false
+
+    - name: Display GHC version after setting default
+      shell: "{{ user_home }}/.ghcup/bin/ghc --version"
+      register: ghc_version_output
+      changed_when: false
+
+    - name: Show GHC version in log
+      debug:
+        msg: "GHC version: {{ ghc_version_output.stdout }}"
+
+    - name: Install Cabal
+      shell: "{{ user_home }}/.ghcup/bin/ghcup install cabal {{ cabal_version }} >> {{ log_file }} 2>&1"
+      args:
+        executable: /bin/bash
+      become: false
+
+    - name: Set Cabal as default
+      shell: "{{ user_home }}/.ghcup/bin/ghcup set cabal {{ cabal_version }} >> {{ log_file }} 2>&1"
+      args:
+        executable: /bin/bash
+      become: false
+
+    - name: Display Cabal version after setting default
+      shell: "{{ user_home }}/.ghcup/bin/cabal --version"
+      register: cabal_version_output
+      changed_when: false
+
+    - name: Show Cabal version in log
+      debug:
+        msg: "Cabal version: {{ cabal_version_output.stdout }}"
+
+    - name: Create a simple test Haskell file
+      copy:
+        content: |
+          main = putStrLn "Hello from Ansible deployed Haskell!"
+        dest: "{{ install_dir }}/hello.hs"
+        mode: '0644'
+
+    - name: Compile the test Haskell file
+      shell: "{{ user_home }}/.ghcup/bin/ghc {{ install_dir }}/hello.hs -o {{ install_dir }}/hello"
+      args:
+        chdir: "{{ install_dir }}"
+      become: false
+
+    - name: Display success message
+      debug:
+        msg: "Playbook completed successfully! Test program compiled at {{ install_dir }}/hello"

@@ -1,45 +1,36 @@
-- name: Review and Update Cardano Config Files
+- name: Download Cardano Mainnet Config Files
   hosts: localhost
+  gather_facts: false
+  vars:
+    dest_dir: "./cardano-master-config"
+    base_url: "https://book.play.dev.cardano.org/environments/mainnet"
+
+    files:
+      - url: "{{ base_url }}/config.json"
+        dest: "mainnet-config-relay.json"
+      - url: "{{ base_url }}/config-bp.json"
+        dest: "mainnet-config-bp.json"        
+      - url: "{{ base_url }}/topology-non-bootstrap-peers.json"
+        dest: "mainnet-topology-relay.json"
+      - url: "{{ base_url }}/byron-genesis.json"
+        dest: "mainnet-byron-genesis.json"
+      - url: "{{ base_url }}/shelley-genesis.json"
+        dest: "mainnet-shelley-genesis.json"
+      - url: "{{ base_url }}/alonzo-genesis.json"
+        dest: "mainnet-alonzo-genesis.json"
+      - url: "{{ base_url }}/conway-genesis.json"
+        dest: "mainnet-conway-genesis.json"
+
   tasks:
-    - name: Fetch latest Cardano config files
-      uri:
-        url: "https://book.world.dev.cardano.org/env-mainnet.html"
-        method: GET
-        return_content: yes
-      register: cardano_config_page
-
-    - name: Parse config file links from the page
-      set_fact:
-        config_links: '{{ cardano_config_page.content | regex_findall("href=\\\"(.*?mainnet-.*?\\\\.json)\\\"") }}'
-
-    - name: Ensure configs directory exists
-      file:
-        path: "configs"
+    - name: Create destination directory
+      ansible.builtin.file:
+        path: "{{ dest_dir }}"
         state: directory
+        mode: '0755'
 
-    - name: Download and compare config files
-      block:
-        - name: Download each config file
-          uri:
-            url: "{{ item }}"
-            dest: "configs/{{ item | basename }}.new"
-          with_items: "{{ config_links }}"
-
-        - name: Compare and replace config files if different
-          command: diff "configs/{{ item | basename }}" "configs/{{ item | basename }}.new"
-          register: diff_result
-          failed_when: diff_result.rc not in [0, 1]
-          with_items: "{{ config_links }}"
-
-        - name: Replace old config with new if different
-          copy:
-            src: "configs/{{ item | basename }}.new"
-            dest: "configs/{{ item | basename }}"
-          when: diff_result.rc == 1
-          with_items: "{{ config_links }}"
-
-        - name: Remove temporary new config files
-          file:
-            path: "configs/{{ item | basename }}.new"
-            state: absent
-          with_items: "{{ config_links }}"
+    - name: Download and rename config files
+      ansible.builtin.get_url:
+        url: "{{ item.url }}"
+        dest: "{{ dest_dir }}/{{ item.dest }}"
+        mode: '0644'
+      loop: "{{ files }}"

@@ -43,7 +43,7 @@
 
     - name: Create cardano-node.service file
       copy:
-        dest: "{{ user_home }}/{{ cardano_node_dir }}cardano-node.service"
+        dest: "/etc/systemd/system/cardano-node.service"
         mode: '0644'
         content: |
           [Unit]
@@ -52,7 +52,7 @@
           After             = network-online.target
 
           [Service]
-          User              = {{ username }
+          User              = {{ username }}
           Type              = simple
           WorkingDirectory  = {{ user_home }}/{{ cardano_node_dir }}
           ExecStart         = /bin/bash -c '{{ user_home }}/{{ cardano_node_dir }}/startCardanoNode.sh'

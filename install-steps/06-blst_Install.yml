@@ -10,6 +10,11 @@
         state: directory
         mode: '0755'
     
+    - name: Remove existing secp256k1 directory if present
+      file:
+        path: "{{ user_home }}/git/secp256k1"
+        state: absent
+
     - name: Clone blst
       git:
         repo: https://github.com/supranational/blst
@@ -21,7 +26,6 @@
       args:
         chdir: "{{ user_home }}/git/blst"
         executable: /bin/bash
-      become: yes
 
     - name: Create libblst.pc
       copy:

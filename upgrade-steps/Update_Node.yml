@@ -1,0 +1,5 @@
+- import_playbook: upgrade-steps/01-GHCup_Install.yml
+- import_playbook: install-steps/04-libsodium_Install.yml
+- import_playbook: install-steps/05-secp256k1_Install.yml
+- import_playbook: install-steps/06-blst_Install.yml
+- import_playbook: install-steps/08-Cardano_Node_Build.yml
