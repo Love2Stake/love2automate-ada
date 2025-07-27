@@ -1,0 +1,80 @@
+---
+- name: Create Cardano node startup script
+  hosts: localhost
+  vars:
+    ../install_param.yml
+
+  tasks:
+    - name: Ensure Cardano directory exists
+      file:
+        path: "{{ user_home }}/{{ cardano_node_dir }}"
+        state: directory
+
+    - name: Ensure Cardano node database directory exists
+      file:
+        path: "{{ user_home }}/{{ cardano_node_dir }}/db"
+        state: directory
+
+    - name: Create Cardano node startup script file
+      copy:
+        dest: "{{ user_home }}/{{ cardano_node_dir }}/startCardanoNode.sh"
+        mode: '0755'
+        content: |
+          #!/bin/bash
+          # Home directory for Cardano node
+          DIRECTORY="{{ user_home }}/{{ cardano_node_dir }}"
+          # Set a variable to indicate the port where the Cardano Node listens
+          PORT={{ cardano_port }}
+          # 0.0.0.0 listens on all local IP addresses for the computer
+          HOSTADDR=0.0.0.0
+          # Set a variable to indicate the file path to your topology file
+          TOPOLOGY=${DIRECTORY}/topology.json
+          # Set a variable to indicate the folder where Cardano Node stores blockchain data
+          DB_PATH=${DIRECTORY}/db
+          # Set a variable to indicate the path to the Cardano Node socket for Inter-process communication (IPC)
+          SOCKET_PATH=${DIRECTORY}/db/socket
+          # Set a variable to indicate the file path to your main Cardano Node configuration file
+          CONFIG=${DIRECTORY}/config.json
+          # Run Cardano Node using the options that you set using variables
+          /usr/local/bin/cardano-node run --topology ${TOPOLOGY} --database-path ${DB_PATH} --socket-path ${SOCKET_PATH} --host-addr ${HOSTADDR} --port ${PORT} --config ${CONFIG}
+
+    - name: Make the Cardano node startup script executable
+      shell: chmod +x "{{ user_home }}/{{ cardano_node_dir }}/startCardanoNode.sh"
+
+    - name: Create cardano-node.service file
+      copy:
+        dest: "{{ user_home }}/{{ cardano_node_dir }}cardano-node.service"
+        mode: '0644'
+        content: |
+          [Unit]
+          Description       = Cardano Node Service
+          Wants             = network-online.target
+          After             = network-online.target
+
+          [Service]
+          User              = {{ username }}
+          Type              = simple
+          WorkingDirectory  = {{ user_home }}/{{ cardano_node_dir }}
+          ExecStart         = /bin/bash -c '{{ user_home }}/{{ cardano_node_dir }}/startCardanoNode.sh'
+          KillSignal        = SIGINT
+          RestartKillSignal = SIGINT
+          TimeoutStopSec    = 300
+          LimitNOFILE       = 32768
+          Restart           = always
+          RestartSec        = 5
+          SyslogIdentifier  = cardano-node
+
+          [Install]
+          WantedBy          = multi-user.target
+
+#    - name: Reload systemd to apply new service
+#      shell: systemctl daemon-reload
+#      become: yes
+
+#    - name: Enable cardano-node service
+#      shell: systemctl enable cardano-node.service
+#      become: yes
+
+#    - name: Start cardano-node service
+#      shell: systemctl start cardano-node.service
+#      become: yes

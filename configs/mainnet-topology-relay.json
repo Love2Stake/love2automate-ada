@@ -1,0 +1,46 @@
+{
+  "bootstrapPeers": [
+    {"address": "backbone.cardano.iog.io", "port": 3001},
+    {"address": "backbone.mainnet.emurgornd.com", "port": 3001},
+    {"address": "backbone.mainnet.cardanofoundation.org", "port": 3001}
+  ],
+  "localRoots": [
+    {
+      "accessPoints": [
+      	{"address": "192.168.1.110", "port": 6000}
+      ],
+      "advertise": false,
+      "trustable": true,
+      "valency": 1
+    },
+      {
+      "accessPoints": [
+        {"address": "192.168.1.85", "port": 6002},
+        {"address": "10.0.10.159", "port": 9000}
+      ],
+      "advertise": true,
+      "trustable": true,
+      "valency": 2
+    },
+    {
+    "accessPoints": [
+      	{"address": "209.97.186.44", "port": 3001},
+        {"address": "34.91.8.205", "port": 3001}
+      ],
+      "advertise": false,
+      "trustable": false,
+      "valency": 2
+    }
+  ],
+   "publicRoots":[
+      {
+         "accessPoints":[
+            {"address": "relays-new.cardano-mainnet.iohk.io", "port": 3001},
+            {"address":"preview-node.world.dev.cardano.org", "port": 30002}      
+         ],
+      	"advertise": true,
+      	"valency": 2
+      }
+   ],
+   "useLedgerAfterSlot": 128908821
+}

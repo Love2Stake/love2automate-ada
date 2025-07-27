@@ -1,0 +1,45 @@
+- name: Review and Update Cardano Config Files
+  hosts: localhost
+  tasks:
+    - name: Fetch latest Cardano config files
+      uri:
+        url: "https://book.world.dev.cardano.org/env-mainnet.html"
+        method: GET
+        return_content: yes
+      register: cardano_config_page
+
+    - name: Parse config file links from the page
+      set_fact:
+        config_links: '{{ cardano_config_page.content | regex_findall("href=\\\"(.*?mainnet-.*?\\\\.json)\\\"") }}'
+
+    - name: Ensure configs directory exists
+      file:
+        path: "configs"
+        state: directory
+
+    - name: Download and compare config files
+      block:
+        - name: Download each config file
+          uri:
+            url: "{{ item }}"
+            dest: "configs/{{ item | basename }}.new"
+          with_items: "{{ config_links }}"
+
+        - name: Compare and replace config files if different
+          command: diff "configs/{{ item | basename }}" "configs/{{ item | basename }}.new"
+          register: diff_result
+          failed_when: diff_result.rc not in [0, 1]
+          with_items: "{{ config_links }}"
+
+        - name: Replace old config with new if different
+          copy:
+            src: "configs/{{ item | basename }}.new"
+            dest: "configs/{{ item | basename }}"
+          when: diff_result.rc == 1
+          with_items: "{{ config_links }}"
+
+        - name: Remove temporary new config files
+          file:
+            path: "configs/{{ item | basename }}.new"
+            state: absent
+          with_items: "{{ config_links }}"

@@ -25,3 +25,5 @@ install_method: "download" # Options: build or download
 
 # Cardano node directory name
 cardano_node_dir: "cardano-my-node"
+# Cardano node port
+cardano_port: 6002
