@@ -2,7 +2,7 @@
   hosts: localhost
   gather_facts: false
   vars:
-    dest_dir: "./cardano-master-config"
+    dest_dir: "/home/danu/git/cardano-master-config"
     base_url: "https://book.play.dev.cardano.org/environments/mainnet"
 
     files:
