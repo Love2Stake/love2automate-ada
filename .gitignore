@@ -1,3 +1,4 @@
-CardanoNodeManager/bin/
-CardanoNodeManager/obj/
-CardanoNodeManager/publish*/
+# C# build artifacts
+**/bin/
+**/obj/
+**/publish*/
