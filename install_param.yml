@@ -1,3 +1,9 @@
+# install_param.yml
+# This file contains parameters for the installation process
+
+# User details
+# Setting username for the user
+username: "danu"
 # Setting home directory for the user
 user_home: "/home/danu"
 # Log file for shell command output
