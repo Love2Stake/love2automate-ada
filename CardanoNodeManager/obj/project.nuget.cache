@@ -1,0 +1,10 @@
+{
+  "version": 2,
+  "dgSpecHash": "nTI6ib3mNIh07zvZE92Gpv3LhYHIQpZn4i7kqaapqKE0B8v7+xrJNOIl3PBptLai+hTqT4oZEGiVEZOvS1U5mA==",
+  "success": true,
+  "projectFilePath": "/home/danyaal/Documents/projects/love2automate-ada/CardanoNodeManager/CardanoNodeManager.csproj",
+  "expectedPackageFiles": [
+    "/home/danyaal/.nuget/packages/system.commandline/2.0.0-beta4.22272.1/system.commandline.2.0.0-beta4.22272.1.nupkg.sha512"
+  ],
+  "logs": []
+}
