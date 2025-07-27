@@ -1,5 +1,7 @@
 using System.CommandLine;
 using System.Diagnostics;
+using System.Net.Http;
+using System.IO.Compression;
 
 namespace CardanoNodeManager;
 
@@ -29,19 +31,23 @@ public class Program
         var statusOption = new Option<bool>(new[] { "--status", "-s" }, "Check status of Cardano node");
         rootCommand.AddOption(statusOption);
 
-        rootCommand.SetHandler(HandleCommand, targetArgument, installOption, uninstallOption, upgradeOption, statusOption);
+        // Setup option
+        var setupOption = new Option<bool>(new[] { "--setup" }, "Download Ansible playbooks and configuration files from repository");
+        rootCommand.AddOption(setupOption);
+
+        rootCommand.SetHandler(HandleCommand, targetArgument, installOption, uninstallOption, upgradeOption, statusOption, setupOption);
 
         return await rootCommand.InvokeAsync(args);
     }
 
-    private static async Task<int> HandleCommand(string? target, bool install, bool uninstall, bool upgrade, bool status)
+    private static async Task<int> HandleCommand(string? target, bool install, bool uninstall, bool upgrade, bool status, bool setup)
     {
         // Count how many options are set
-        int optionCount = (install ? 1 : 0) + (uninstall ? 1 : 0) + (upgrade ? 1 : 0) + (status ? 1 : 0);
+        int optionCount = (install ? 1 : 0) + (uninstall ? 1 : 0) + (upgrade ? 1 : 0) + (status ? 1 : 0) + (setup ? 1 : 0);
         
         if (optionCount == 0)
         {
-            Console.WriteLine("Please specify an operation: --install/-i, --uninstall/-u, --upgrade/-g, or --status/-s");
+            Console.WriteLine("Please specify an operation: --install/-i, --uninstall/-u, --upgrade/-g, --status/-s, or --setup");
             return 1;
         }
         
@@ -80,6 +86,8 @@ public class Program
         }
         else if (status)
             return await HandleStatus();
+        else if (setup)
+            return await HandleSetup();
             
         return 1;
     }
@@ -112,7 +120,7 @@ public class Program
         return 1;
     }
 
-    private static async Task<int> HandleUpgrade(string target)
+    private static Task<int> HandleUpgrade(string target)
     {
         Console.WriteLine($"Upgrading {target}...");
         
@@ -122,12 +130,12 @@ public class Program
             // For upgrade, we might want to run specific upgrade playbooks
             Console.WriteLine("Note: Upgrade steps are available in upgrade-steps/ directory");
             Console.WriteLine("Consider implementing specific upgrade playbook execution here");
-            return 0;
+            return Task.FromResult(0);
         }
         
         Console.WriteLine($"Unknown target: {target}");
         Console.WriteLine("Available targets: cardano-node");
-        return 1;
+        return Task.FromResult(1);
     }
 
     private static async Task<int> HandleStatus()
@@ -155,6 +163,142 @@ public class Program
         }
         
         return 0;
+    }
+
+    private static async Task<int> HandleSetup()
+    {
+        Console.WriteLine("Setting up love2automate-ada...");
+        Console.WriteLine("Downloading Ansible playbooks and configuration files from repository...");
+
+        var setupDir = "/opt/love2automate-ada";
+
+        try
+        {
+            // Check if we have permission to write to /opt
+            if (!CanWriteToDirectory("/opt"))
+            {
+                Console.WriteLine("✗ Setup requires sudo privileges to install to /opt/love2automate-ada");
+                Console.WriteLine("Please run: sudo love2automate-ada --setup");
+                return 1;
+            }
+
+            // Create setup directory if it doesn't exist
+            if (Directory.Exists(setupDir))
+            {
+                Console.WriteLine($"Setup directory already exists: {setupDir}");
+                Console.Write("Do you want to overwrite existing files? (y/N): ");
+                var userResponse = Console.ReadLine()?.ToLower();
+                if (userResponse != "y" && userResponse != "yes")
+                {
+                    Console.WriteLine("Setup cancelled.");
+                    return 0;
+                }
+                Directory.Delete(setupDir, true);
+            }
+
+            Directory.CreateDirectory(setupDir);
+
+            // Download the repository archive
+            using var httpClient = new HttpClient();
+            Console.WriteLine("Downloading repository archive...");
+            
+            var repoUrl = "https://github.com/Love2Stake/love2automate-ada/archive/refs/heads/main.zip";
+            var response = await httpClient.GetAsync(repoUrl);
+            
+            if (!response.IsSuccessStatusCode)
+            {
+                Console.WriteLine($"✗ Failed to download repository: {response.StatusCode}");
+                return 1;
+            }
+
+            // Save and extract the zip file
+            var zipPath = Path.Combine(setupDir, "repo.zip");
+            await using (var fileStream = File.Create(zipPath))
+            {
+                await response.Content.CopyToAsync(fileStream);
+            }
+
+            Console.WriteLine("Extracting files...");
+            ZipFile.ExtractToDirectory(zipPath, setupDir);
+
+            // Move files from extracted directory to setup directory
+            var extractedDir = Path.Combine(setupDir, "love2automate-ada-main");
+            if (Directory.Exists(extractedDir))
+            {
+                // Copy all files except the terminal app directory
+                foreach (var item in Directory.GetFileSystemEntries(extractedDir))
+                {
+                    var itemName = Path.GetFileName(item);
+                    if (itemName == "love2automate-ada-terminalapp") continue;
+
+                    var destPath = Path.Combine(setupDir, itemName);
+                    if (Directory.Exists(item))
+                    {
+                        CopyDirectory(item, destPath);
+                    }
+                    else
+                    {
+                        File.Copy(item, destPath, true);
+                    }
+                }
+
+                // Clean up
+                Directory.Delete(extractedDir, true);
+            }
+
+            File.Delete(zipPath);
+
+            Console.WriteLine($"✓ Setup completed successfully!");
+            Console.WriteLine($"Ansible files installed to: {setupDir}");
+            Console.WriteLine();
+            Console.WriteLine("You can now run:");
+            Console.WriteLine("  love2automate-ada --install cardano-node");
+            
+            return 0;
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"✗ Setup failed: {ex.Message}");
+            if (Directory.Exists(setupDir))
+            {
+                try { Directory.Delete(setupDir, true); } catch { }
+            }
+            return 1;
+        }
+    }
+
+    private static bool CanWriteToDirectory(string path)
+    {
+        try
+        {
+            var testFile = Path.Combine(path, $"test_{Guid.NewGuid()}.tmp");
+            File.WriteAllText(testFile, "test");
+            File.Delete(testFile);
+            return true;
+        }
+        catch
+        {
+            return false;
+        }
+    }
+
+    private static void CopyDirectory(string sourceDir, string destDir)
+    {
+        Directory.CreateDirectory(destDir);
+        
+        foreach (var file in Directory.GetFiles(sourceDir))
+        {
+            var fileName = Path.GetFileName(file);
+            var destFile = Path.Combine(destDir, fileName);
+            File.Copy(file, destFile, true);
+        }
+        
+        foreach (var dir in Directory.GetDirectories(sourceDir))
+        {
+            var dirName = Path.GetFileName(dir);
+            var destSubDir = Path.Combine(destDir, dirName);
+            CopyDirectory(dir, destSubDir);
+        }
     }
 
     private static async Task<int> ExecuteAnsiblePlaybook(string playbookFile, string paramFile)
@@ -273,16 +417,17 @@ public class Program
 
     private static string GetProjectRoot()
     {
-        var currentDir = Directory.GetCurrentDirectory();
+        // Always use the standard application directory
+        var appDir = "/opt/love2automate-ada";
         
-        // Look for the project root by finding key files
-        while (currentDir != null && !File.Exists(Path.Combine(currentDir, "Build.yml")))
+        // Check if setup has been run
+        if (!Directory.Exists(appDir) || !File.Exists(Path.Combine(appDir, "Build.yml")))
         {
-            var parent = Directory.GetParent(currentDir);
-            if (parent == null) break;
-            currentDir = parent.FullName;
+            Console.WriteLine("✗ Ansible files not found. Please run setup first:");
+            Console.WriteLine("  sudo love2automate-ada --setup");
+            Environment.Exit(1);
         }
         
-        return currentDir ?? Directory.GetCurrentDirectory();
+        return appDir;
     }
 }
