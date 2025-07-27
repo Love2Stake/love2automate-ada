@@ -2,7 +2,7 @@
 - name: Create Cardano node startup script
   hosts: localhost
   vars:
-    ../install_param.yml
+    - ../install_param.yml
 
   tasks:
     - name: Ensure Cardano directory exists
