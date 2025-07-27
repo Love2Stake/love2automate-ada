@@ -9,34 +9,79 @@ public class Program
     {
         var rootCommand = new RootCommand("Cardano Node Management Tool - Automates Ansible playbook execution for Cardano node operations");
 
-        // Install command
-        var installCommand = new Command("install", "Install Cardano node components");
-        var installTarget = new Argument<string>("target", "Target to install (e.g., cardano-node)");
-        installCommand.AddArgument(installTarget);
-        installCommand.SetHandler(async (target) => await HandleInstall(target), installTarget);
+        // Target argument (optional)
+        var targetArgument = new Argument<string?>("target", () => null, "Target to operate on (e.g., cardano-node). Not required for status checks.");
+        rootCommand.AddArgument(targetArgument);
 
-        // Uninstall command
-        var uninstallCommand = new Command("uninstall", "Uninstall Cardano node components");
-        var uninstallTarget = new Argument<string>("target", "Target to uninstall (e.g., cardano-node)");
-        uninstallCommand.AddArgument(uninstallTarget);
-        uninstallCommand.SetHandler(async (target) => await HandleUninstall(target), uninstallTarget);
+        // Install option
+        var installOption = new Option<bool>(new[] { "--install", "-i" }, "Install Cardano node components");
+        rootCommand.AddOption(installOption);
 
-        // Upgrade command
-        var upgradeCommand = new Command("upgrade", "Upgrade Cardano node components");
-        var upgradeTarget = new Argument<string>("target", "Target to upgrade (e.g., cardano-node)");
-        upgradeCommand.AddArgument(upgradeTarget);
-        upgradeCommand.SetHandler(async (target) => await HandleUpgrade(target), upgradeTarget);
+        // Uninstall option
+        var uninstallOption = new Option<bool>(new[] { "--uninstall", "-u" }, "Uninstall Cardano node components");
+        rootCommand.AddOption(uninstallOption);
 
-        // Status command
-        var statusCommand = new Command("status", "Check status of Cardano node");
-        statusCommand.SetHandler(async () => await HandleStatus());
+        // Upgrade option
+        var upgradeOption = new Option<bool>(new[] { "--upgrade", "-g" }, "Upgrade Cardano node components");
+        rootCommand.AddOption(upgradeOption);
 
-        rootCommand.AddCommand(installCommand);
-        rootCommand.AddCommand(uninstallCommand);
-        rootCommand.AddCommand(upgradeCommand);
-        rootCommand.AddCommand(statusCommand);
+        // Status option
+        var statusOption = new Option<bool>(new[] { "--status", "-s" }, "Check status of Cardano node");
+        rootCommand.AddOption(statusOption);
+
+        rootCommand.SetHandler(HandleCommand, targetArgument, installOption, uninstallOption, upgradeOption, statusOption);
 
         return await rootCommand.InvokeAsync(args);
+    }
+
+    private static async Task<int> HandleCommand(string? target, bool install, bool uninstall, bool upgrade, bool status)
+    {
+        // Count how many options are set
+        int optionCount = (install ? 1 : 0) + (uninstall ? 1 : 0) + (upgrade ? 1 : 0) + (status ? 1 : 0);
+        
+        if (optionCount == 0)
+        {
+            Console.WriteLine("Please specify an operation: --install/-i, --uninstall/-u, --upgrade/-g, or --status/-s");
+            return 1;
+        }
+        
+        if (optionCount > 1)
+        {
+            Console.WriteLine("Please specify only one operation at a time.");
+            return 1;
+        }
+
+        if (install)
+        {
+            if (string.IsNullOrEmpty(target))
+            {
+                Console.WriteLine("Target is required for install operation. Available targets: cardano-node");
+                return 1;
+            }
+            return await HandleInstall(target);
+        }
+        else if (uninstall)
+        {
+            if (string.IsNullOrEmpty(target))
+            {
+                Console.WriteLine("Target is required for uninstall operation. Available targets: cardano-node");
+                return 1;
+            }
+            return await HandleUninstall(target);
+        }
+        else if (upgrade)
+        {
+            if (string.IsNullOrEmpty(target))
+            {
+                Console.WriteLine("Target is required for upgrade operation. Available targets: cardano-node");
+                return 1;
+            }
+            return await HandleUpgrade(target);
+        }
+        else if (status)
+            return await HandleStatus();
+            
+        return 1;
     }
 
     private static async Task<int> HandleInstall(string target)

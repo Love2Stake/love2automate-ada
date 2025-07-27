@@ -13,7 +13,7 @@ using System.Reflection;
 [assembly: System.Reflection.AssemblyCompanyAttribute("CardanoNodeManager")]
 [assembly: System.Reflection.AssemblyConfigurationAttribute("Debug")]
 [assembly: System.Reflection.AssemblyFileVersionAttribute("1.0.0.0")]
-[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+66558d887800d046af23640a24f4721106ef58fa")]
+[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+0c3e10bafc7ac52fd697fb2050ca5e9b7b252a33")]
 [assembly: System.Reflection.AssemblyProductAttribute("CardanoNodeManager")]
 [assembly: System.Reflection.AssemblyTitleAttribute("CardanoNodeManager")]
 [assembly: System.Reflection.AssemblyVersionAttribute("1.0.0.0")]
