@@ -2,7 +2,7 @@ Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio Version 17
 VisualStudioVersion = 17.5.2.0
 MinimumVisualStudioVersion = 10.0.40219.1
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "CardanoNodeManager", "CardanoNodeManager\CardanoNodeManager.csproj", "{79DD004D-B19D-14C3-80D6-358A2C2CD022}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "CardanoNodeManager", "love2automate-ada-terminalapp\CardanoNodeManager.csproj", "{63AECB70-660F-7D1B-74EF-431D24C34845}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -10,15 +10,15 @@ Global
 		Release|Any CPU = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(ProjectConfigurationPlatforms) = postSolution
-		{79DD004D-B19D-14C3-80D6-358A2C2CD022}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
-		{79DD004D-B19D-14C3-80D6-358A2C2CD022}.Debug|Any CPU.Build.0 = Debug|Any CPU
-		{79DD004D-B19D-14C3-80D6-358A2C2CD022}.Release|Any CPU.ActiveCfg = Release|Any CPU
-		{79DD004D-B19D-14C3-80D6-358A2C2CD022}.Release|Any CPU.Build.0 = Release|Any CPU
+		{63AECB70-660F-7D1B-74EF-431D24C34845}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{63AECB70-660F-7D1B-74EF-431D24C34845}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{63AECB70-660F-7D1B-74EF-431D24C34845}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{63AECB70-660F-7D1B-74EF-431D24C34845}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
 	EndGlobalSection
 	GlobalSection(ExtensibilityGlobals) = postSolution
-		SolutionGuid = {9BF5ED08-9B0B-47F1-888F-AA2A77C63DF7}
+		SolutionGuid = {87EF29C5-2581-42AC-B881-CA83FB8282FF}
 	EndGlobalSection
 EndGlobal

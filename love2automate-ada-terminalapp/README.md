@@ -46,9 +46,31 @@ Provides information about available upgrade steps.
 
 #### Check Status
 ```bash
-dotnet run -- status
+dotnet run -- --status
 ```
 Checks if the Cardano node process is running and if port 6002 is listening.
+
+#### Setup Dependencies
+```bash
+dotnet run -- --setup-deps
+```
+Installs required dependencies including:
+- Updates apt package index
+- Installs python3-pip
+- Installs Ansible via pip3
+- Updates PATH in .bashrc
+- Installs required Ansible collections (community.general, ansible.posix)
+
+#### Cleanup Test (Temporary)
+```bash
+dotnet run -- --cleanup-test
+```
+**WARNING**: Removes ALL installed components for testing purposes. This includes:
+- Cardano node installation
+- All build dependencies
+- GHCup installation
+- Ansible playbook files
+- Environment variables from .bashrc
 
 ### Help
 ```bash
