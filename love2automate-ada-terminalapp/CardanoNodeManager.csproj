@@ -6,6 +6,8 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
     <AssemblyName>love2automate-ada</AssemblyName>
+    <VersionPrefix>1.0.0</VersionPrefix>
+    <VersionSuffix>beta</VersionSuffix>
   </PropertyGroup>
 
   <ItemGroup>

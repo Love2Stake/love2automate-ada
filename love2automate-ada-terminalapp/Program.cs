@@ -23,9 +23,9 @@ public class Program
         var uninstallOption = new Option<bool>(new[] { "--uninstall", "-u" }, "Uninstall Cardano node components");
         rootCommand.AddOption(uninstallOption);
 
-        // Upgrade option
-        var upgradeOption = new Option<bool>(new[] { "--upgrade", "-g" }, "Upgrade Cardano node components");
-        rootCommand.AddOption(upgradeOption);
+        // Upgrade option (COMMENTED OUT - NOT TESTED YET)
+        // var upgradeOption = new Option<bool>(new[] { "--upgrade", "-g" }, "Upgrade Cardano node components");
+        // rootCommand.AddOption(upgradeOption);
 
         // Status option
         var statusOption = new Option<bool>(new[] { "--status", "-s" }, "Check status of Cardano node");
@@ -39,23 +39,23 @@ public class Program
         var setupDepsOption = new Option<bool>(new[] { "--setup-deps" }, "Install required dependencies (apt update, ansible, collections)");
         rootCommand.AddOption(setupDepsOption);
 
-        // Cleanup test option (temporary for testing)
-        var cleanupTestOption = new Option<bool>(new[] { "--cleanup-test" }, "Remove all installed components for testing purposes");
-        rootCommand.AddOption(cleanupTestOption);
+        // Complete removal option
+        var completeRemovalOption = new Option<bool>(new[] { "--remove-all" }, "Completely remove all installed components and dependencies");
+        rootCommand.AddOption(completeRemovalOption);
 
-        rootCommand.SetHandler(HandleCommand, targetArgument, installOption, uninstallOption, upgradeOption, statusOption, setupOption, setupDepsOption, cleanupTestOption);
+        rootCommand.SetHandler(HandleCommand, targetArgument, installOption, uninstallOption, statusOption, setupOption, setupDepsOption, completeRemovalOption);
 
         return await rootCommand.InvokeAsync(args);
     }
 
-    private static async Task<int> HandleCommand(string? target, bool install, bool uninstall, bool upgrade, bool status, bool setup, bool setupDeps, bool cleanupTest)
+    private static async Task<int> HandleCommand(string? target, bool install, bool uninstall, bool status, bool setup, bool setupDeps, bool removeAll)
     {
         // Count how many options are set
-        int optionCount = (install ? 1 : 0) + (uninstall ? 1 : 0) + (upgrade ? 1 : 0) + (status ? 1 : 0) + (setup ? 1 : 0) + (setupDeps ? 1 : 0) + (cleanupTest ? 1 : 0);
+        int optionCount = (install ? 1 : 0) + (uninstall ? 1 : 0) + (status ? 1 : 0) + (setup ? 1 : 0) + (setupDeps ? 1 : 0) + (removeAll ? 1 : 0);
         
         if (optionCount == 0)
         {
-            Console.WriteLine("Please specify an operation: --install/-i, --uninstall/-u, --upgrade/-g, --status/-s, --setup, --setup-deps, or --cleanup-test");
+            Console.WriteLine("Please specify an operation: --install/-i, --uninstall/-u, --status/-s, --setup, --setup-deps, or --remove-all");
             return 1;
         }
         
@@ -83,6 +83,8 @@ public class Program
             }
             return await HandleUninstall(target);
         }
+        // UPGRADE FUNCTIONALITY COMMENTED OUT - NOT TESTED YET
+        /*
         else if (upgrade)
         {
             if (string.IsNullOrEmpty(target))
@@ -92,14 +94,15 @@ public class Program
             }
             return await HandleUpgrade(target);
         }
+        */
         else if (status)
             return await HandleStatus();
         else if (setup)
             return await HandleSetup();
         else if (setupDeps)
             return await HandleSetupDependencies();
-        else if (cleanupTest)
-            return await HandleCleanupTest();
+        else if (removeAll)
+            return await HandleCompleteRemoval();
             
         return 1;
     }
@@ -146,6 +149,8 @@ public class Program
         return 1;
     }
 
+    // UPGRADE FUNCTIONALITY COMMENTED OUT - NOT TESTED YET
+    /*
     private static async Task<int> HandleUpgrade(string target)
     {
         Console.WriteLine($"Upgrading {target}...");
@@ -170,6 +175,7 @@ public class Program
         Console.WriteLine("Available targets: cardano-node");
         return 1;
     }
+    */
 
     private static async Task<int> HandleStatus()
     {
@@ -454,14 +460,15 @@ public class Program
         }
     }
 
-    private static async Task<int> HandleCleanupTest()
+    private static async Task<int> HandleCompleteRemoval()
     {
-        Console.WriteLine("⚠️  WARNING: This will remove ALL installed components for testing purposes!");
+        Console.WriteLine("⚠️  WARNING: This will completely remove ALL installed components and dependencies!");
         Console.WriteLine("This includes:");
         Console.WriteLine("- Cardano node installation");
         Console.WriteLine("- All build dependencies");
         Console.WriteLine("- GHCup installation");
         Console.WriteLine("- Ansible playbook files");
+        Console.WriteLine("- Environment variables");
         Console.WriteLine();
         Console.Write("Are you sure you want to proceed? Type 'YES' to confirm: ");
         
