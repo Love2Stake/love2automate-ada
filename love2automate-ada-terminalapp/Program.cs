@@ -23,9 +23,9 @@ public class Program
         var uninstallOption = new Option<bool>(new[] { "--uninstall", "-u" }, "Uninstall Cardano node components");
         rootCommand.AddOption(uninstallOption);
 
-        // Upgrade option
-        var upgradeOption = new Option<bool>(new[] { "--upgrade", "-g" }, "Upgrade Cardano node components");
-        rootCommand.AddOption(upgradeOption);
+        // Upgrade option (COMMENTED OUT - NOT TESTED YET)
+        // var upgradeOption = new Option<bool>(new[] { "--upgrade", "-g" }, "Upgrade Cardano node components");
+        // rootCommand.AddOption(upgradeOption);
 
         // Status option
         var statusOption = new Option<bool>(new[] { "--status", "-s" }, "Check status of Cardano node");
@@ -35,19 +35,27 @@ public class Program
         var setupOption = new Option<bool>(new[] { "--setup" }, "Download Ansible playbooks and configuration files from repository");
         rootCommand.AddOption(setupOption);
 
-        rootCommand.SetHandler(HandleCommand, targetArgument, installOption, uninstallOption, upgradeOption, statusOption, setupOption);
+        // Setup dependencies option
+        var setupDepsOption = new Option<bool>(new[] { "--setup-deps" }, "Install required dependencies (apt update, ansible, collections)");
+        rootCommand.AddOption(setupDepsOption);
+
+        // Complete removal option
+        var completeRemovalOption = new Option<bool>(new[] { "--remove-all" }, "Completely remove all installed components and dependencies");
+        rootCommand.AddOption(completeRemovalOption);
+
+        rootCommand.SetHandler(HandleCommand, targetArgument, installOption, uninstallOption, statusOption, setupOption, setupDepsOption, completeRemovalOption);
 
         return await rootCommand.InvokeAsync(args);
     }
 
-    private static async Task<int> HandleCommand(string? target, bool install, bool uninstall, bool upgrade, bool status, bool setup)
+    private static async Task<int> HandleCommand(string? target, bool install, bool uninstall, bool status, bool setup, bool setupDeps, bool removeAll)
     {
         // Count how many options are set
-        int optionCount = (install ? 1 : 0) + (uninstall ? 1 : 0) + (upgrade ? 1 : 0) + (status ? 1 : 0) + (setup ? 1 : 0);
+        int optionCount = (install ? 1 : 0) + (uninstall ? 1 : 0) + (status ? 1 : 0) + (setup ? 1 : 0) + (setupDeps ? 1 : 0) + (removeAll ? 1 : 0);
         
         if (optionCount == 0)
         {
-            Console.WriteLine("Please specify an operation: --install/-i, --uninstall/-u, --upgrade/-g, --status/-s, or --setup");
+            Console.WriteLine("Please specify an operation: --install/-i, --uninstall/-u, --status/-s, --setup, --setup-deps, or --remove-all");
             return 1;
         }
         
@@ -75,6 +83,8 @@ public class Program
             }
             return await HandleUninstall(target);
         }
+        // UPGRADE FUNCTIONALITY COMMENTED OUT - NOT TESTED YET
+        /*
         else if (upgrade)
         {
             if (string.IsNullOrEmpty(target))
@@ -84,10 +94,15 @@ public class Program
             }
             return await HandleUpgrade(target);
         }
+        */
         else if (status)
             return await HandleStatus();
         else if (setup)
             return await HandleSetup();
+        else if (setupDeps)
+            return await HandleSetupDependencies();
+        else if (removeAll)
+            return await HandleCompleteRemoval();
             
         return 1;
     }
@@ -95,6 +110,13 @@ public class Program
     private static async Task<int> HandleInstall(string target)
     {
         Console.WriteLine($"Installing {target}...");
+        
+        // Check prerequisites before proceeding
+        var prereqCheck = await CheckPrerequisites();
+        if (prereqCheck != 0)
+        {
+            return prereqCheck;
+        }
         
         if (target.ToLower() == "cardano-node")
         {
@@ -110,6 +132,13 @@ public class Program
     {
         Console.WriteLine($"Uninstalling {target}...");
         
+        // Check prerequisites before proceeding
+        var prereqCheck = await CheckPrerequisites();
+        if (prereqCheck != 0)
+        {
+            return prereqCheck;
+        }
+        
         if (target.ToLower() == "cardano-node")
         {
             return await ExecuteAnsiblePlaybook("Uninstall.yml", "uninstall-steps/uninstall_param.yml");
@@ -120,9 +149,18 @@ public class Program
         return 1;
     }
 
-    private static Task<int> HandleUpgrade(string target)
+    // UPGRADE FUNCTIONALITY COMMENTED OUT - NOT TESTED YET
+    /*
+    private static async Task<int> HandleUpgrade(string target)
     {
         Console.WriteLine($"Upgrading {target}...");
+        
+        // Check prerequisites before proceeding
+        var prereqCheck = await CheckPrerequisites();
+        if (prereqCheck != 0)
+        {
+            return prereqCheck;
+        }
         
         if (target.ToLower() == "cardano-node")
         {
@@ -130,13 +168,14 @@ public class Program
             // For upgrade, we might want to run specific upgrade playbooks
             Console.WriteLine("Note: Upgrade steps are available in upgrade-steps/ directory");
             Console.WriteLine("Consider implementing specific upgrade playbook execution here");
-            return Task.FromResult(0);
+            return 0;
         }
         
         Console.WriteLine($"Unknown target: {target}");
         Console.WriteLine("Available targets: cardano-node");
-        return Task.FromResult(1);
+        return 1;
     }
+    */
 
     private static async Task<int> HandleStatus()
     {
@@ -267,6 +306,377 @@ public class Program
         }
     }
 
+    private static async Task<int> HandleSetupDependencies()
+    {
+        Console.WriteLine("Setting up dependencies for love2automate-ada...");
+        Console.WriteLine("This will install Ansible and required collections.");
+        
+        try
+        {
+            // Update package index
+            Console.WriteLine("Updating package index...");
+            var updateResult = await ExecuteCommand("sudo", "apt update");
+            if (updateResult.ExitCode != 0)
+            {
+                Console.WriteLine("✗ Failed to update package index");
+                return 1;
+            }
+            Console.WriteLine("✓ Package index updated");
+
+            // Install required packages including pipx for modern Python package management
+            Console.WriteLine("Installing required packages...");
+            var packagesResult = await ExecuteCommand("sudo", "apt install -y python3-pip python3-venv pipx");
+            if (packagesResult.ExitCode != 0)
+            {
+                Console.WriteLine("✗ Failed to install required packages");
+                return 1;
+            }
+            Console.WriteLine("✓ Required packages installed");
+
+            // Install ansible-core using pipx (includes ansible-playbook and ansible-galaxy)
+            Console.WriteLine("Installing Ansible Core using pipx...");
+            var ansibleCoreResult = await ExecuteCommand("pipx", "install ansible-core");
+            if (ansibleCoreResult.ExitCode != 0)
+            {
+                Console.WriteLine("Pipx installation failed, trying with pip3 --user --break-system-packages...");
+                var fallbackResult = await ExecuteCommand("pip3", "install --user --break-system-packages ansible-core");
+                if (fallbackResult.ExitCode != 0)
+                {
+                    Console.WriteLine("✗ Failed to install ansible-core with both methods");
+                    return 1;
+                }
+            }
+            Console.WriteLine("✓ Ansible Core installed");
+
+            // Also install the full ansible package for additional modules
+            Console.WriteLine("Installing full Ansible package...");
+            var ansibleFullResult = await ExecuteCommand("pipx", "install ansible");
+            if (ansibleFullResult.ExitCode != 0)
+            {
+                Console.WriteLine("Full ansible package installation failed, continuing with core only...");
+            }
+            else
+            {
+                Console.WriteLine("✓ Full Ansible package installed");
+            }
+
+            // Ensure pipx bin directory is in PATH
+            Console.WriteLine("Ensuring pipx is properly configured...");
+            await ExecuteCommand("pipx", "ensurepath");
+
+            // Add to PATH in .bashrc if not already present
+            Console.WriteLine("Updating PATH in .bashrc...");
+            var homeDir = Environment.GetEnvironmentVariable("HOME");
+            var bashrcPath = Path.Combine(homeDir ?? "/root", ".bashrc");
+            var pathExportPip = "export PATH=\"$HOME/.local/bin:$PATH\"";
+            
+            if (File.Exists(bashrcPath))
+            {
+                var bashrcContent = await File.ReadAllTextAsync(bashrcPath);
+                var needsUpdate = false;
+                var pathsToAdd = new List<string>();
+                
+                if (!bashrcContent.Contains("$HOME/.local/bin"))
+                {
+                    pathsToAdd.Add(pathExportPip);
+                    needsUpdate = true;
+                }
+                
+                if (needsUpdate)
+                {
+                    var pathSection = "\n# Added by love2automate-ada setup\n" + string.Join("\n", pathsToAdd) + "\n";
+                    await File.AppendAllTextAsync(bashrcPath, pathSection);
+                    Console.WriteLine("✓ PATH updated in .bashrc");
+                }
+                else
+                {
+                    Console.WriteLine("✓ PATH already configured in .bashrc");
+                }
+            }
+
+            // Install Ansible collections
+            Console.WriteLine("Installing Ansible collections...");
+            
+            // Try to find ansible-galaxy in common locations
+            var ansibleGalaxyPaths = new[]
+            {
+                "ansible-galaxy", // If in PATH
+                $"{homeDir}/.local/bin/ansible-galaxy", // pipx/pip user install
+                "/usr/bin/ansible-galaxy" // system install
+            };
+            
+            string? workingAnsibleGalaxy = null;
+            foreach (var path in ansibleGalaxyPaths)
+            {
+                var testResult = await ExecuteCommand("which", path, suppressOutput: true);
+                if (testResult.ExitCode == 0 || File.Exists(path))
+                {
+                    workingAnsibleGalaxy = path;
+                    break;
+                }
+            }
+            
+            if (workingAnsibleGalaxy == null)
+            {
+                Console.WriteLine("✗ Could not find ansible-galaxy command");
+                return 1;
+            }
+            
+            // Install community.general collection
+            var communityResult = await ExecuteCommand(workingAnsibleGalaxy, "collection install community.general");
+            if (communityResult.ExitCode != 0)
+            {
+                Console.WriteLine("✗ Failed to install community.general collection");
+                return 1;
+            }
+            Console.WriteLine("✓ community.general collection installed");
+
+            // Install ansible.posix collection
+            var posixResult = await ExecuteCommand(workingAnsibleGalaxy, "collection install ansible.posix");
+            if (posixResult.ExitCode != 0)
+            {
+                Console.WriteLine("✗ Failed to install ansible.posix collection");
+                return 1;
+            }
+            Console.WriteLine("✓ ansible.posix collection installed");
+
+            Console.WriteLine();
+            Console.WriteLine("✓ Dependencies setup completed successfully!");
+            Console.WriteLine();
+            Console.WriteLine("⚠️  IMPORTANT: You MUST restart your terminal or run 'source ~/.bashrc' for PATH changes to take effect.");
+            Console.WriteLine();
+            Console.WriteLine("Next steps:");
+            Console.WriteLine("1. Restart your terminal (or run: source ~/.bashrc)");
+            Console.WriteLine("2. Run: love2automate-ada --setup");
+            Console.WriteLine("3. Configure your inventory.ini file");
+            Console.WriteLine("4. Run: love2automate-ada --install cardano-node");
+
+            return 0;
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"✗ Dependencies setup failed: {ex.Message}");
+            return 1;
+        }
+    }
+
+    private static async Task<int> HandleCompleteRemoval()
+    {
+        Console.WriteLine("⚠️  WARNING: This will completely remove ALL installed components and dependencies!");
+        Console.WriteLine("This includes:");
+        Console.WriteLine("- Cardano node installation");
+        Console.WriteLine("- All build dependencies");
+        Console.WriteLine("- GHCup installation");
+        Console.WriteLine("- Ansible playbook files");
+        Console.WriteLine("- Environment variables");
+        Console.WriteLine();
+        Console.Write("Are you sure you want to proceed? Type 'YES' to confirm: ");
+        
+        var confirmation = Console.ReadLine();
+        if (confirmation != "YES")
+        {
+            Console.WriteLine("Cleanup cancelled.");
+            return 0;
+        }
+
+        Console.WriteLine("Starting cleanup process...");
+
+        try
+        {
+            // Stop cardano-node if running
+            Console.WriteLine("Stopping Cardano node...");
+            await ExecuteCommand("sudo", "pkill -f cardano-node");
+            await ExecuteCommand("sudo", "systemctl stop cardano-node");
+            await ExecuteCommand("sudo", "systemctl disable cardano-node");
+
+            // Run the Uninstall.yml playbook to properly remove Cardano node
+            Console.WriteLine("Running Uninstall.yml playbook...");
+            var uninstallResult = await ExecuteAnsiblePlaybook("Uninstall.yml", "uninstall-steps/uninstall_param.yml");
+            if (uninstallResult != 0)
+            {
+                Console.WriteLine("⚠️  Uninstall playbook failed, but continuing with cleanup...");
+            }
+
+            // Remove ansible files
+            Console.WriteLine("Removing Ansible files...");
+            await ExecuteCommand("sudo", "rm -rf /opt/love2automate-ada");
+
+            // Clean up environment variables from .bashrc
+            Console.WriteLine("Cleaning up environment variables...");
+            var homeDir = Environment.GetEnvironmentVariable("HOME");
+            var bashrcPath = Path.Combine(homeDir ?? "/root", ".bashrc");
+            
+            if (File.Exists(bashrcPath))
+            {
+                var bashrcContent = await File.ReadAllTextAsync(bashrcPath);
+                var lines = bashrcContent.Split('\n').ToList();
+                
+                // Remove lines added by love2automate-ada
+                for (int i = lines.Count - 1; i >= 0; i--)
+                {
+                    if (lines[i].Contains("love2automate-ada") || 
+                        lines[i].Contains("LD_LIBRARY_PATH") ||
+                        lines[i].Contains("PKG_CONFIG_PATH") ||
+                        (i > 0 && lines[i-1].Contains("love2automate-ada")))
+                    {
+                        lines.RemoveAt(i);
+                    }
+                }
+                
+                await File.WriteAllTextAsync(bashrcPath, string.Join('\n', lines));
+            }
+
+            // Reload systemd
+            await ExecuteCommand("sudo", "systemctl daemon-reload");
+
+            Console.WriteLine();
+            Console.WriteLine("✓ Cleanup completed successfully!");
+            Console.WriteLine("The system has been restored to a clean state.");
+            Console.WriteLine("Note: You may need to restart your shell to clear environment variables.");
+
+            return 0;
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"✗ Cleanup failed: {ex.Message}");
+            return 1;
+        }
+    }
+
+    private static async Task<int> CheckPrerequisites()
+    {
+        Console.WriteLine("Checking prerequisites...");
+        
+        // Check 1: Ansible installation
+        Console.Write("Checking Ansible installation... ");
+        
+        // Try to find ansible-playbook in common locations
+        var homeDir = Environment.GetEnvironmentVariable("HOME");
+        var ansiblePlaybookPaths = new[]
+        {
+            "ansible-playbook", // If in PATH
+            $"{homeDir}/.local/bin/ansible-playbook", // pipx/pip user install
+            "/usr/bin/ansible-playbook" // system install
+        };
+        
+        bool ansibleFound = false;
+        foreach (var path in ansiblePlaybookPaths)
+        {
+            var testResult = await ExecuteCommand("which", path, suppressOutput: true);
+            if (testResult.ExitCode == 0 || File.Exists(path))
+            {
+                ansibleFound = true;
+                break;
+            }
+        }
+        
+        if (!ansibleFound)
+        {
+            Console.WriteLine("✗ NOT FOUND");
+            Console.WriteLine();
+            Console.WriteLine("Ansible is not installed or not in PATH.");
+            Console.WriteLine("Please run: love2automate-ada --setup-deps");
+            return 1;
+        }
+        Console.WriteLine("✓ FOUND");
+
+        // Check 2: Required Ansible collections
+        Console.Write("Checking Ansible collections... ");
+        
+        // Try to find ansible-galaxy in common locations
+        var ansibleGalaxyPaths = new[]
+        {
+            "ansible-galaxy", // If in PATH
+            $"{homeDir}/.local/bin/ansible-galaxy", // pipx/pip user install
+            "/usr/bin/ansible-galaxy" // system install
+        };
+        
+        string? workingAnsibleGalaxy = null;
+        foreach (var path in ansibleGalaxyPaths)
+        {
+            var testResult = await ExecuteCommand("which", path, suppressOutput: true);
+            if (testResult.ExitCode == 0 || File.Exists(path))
+            {
+                workingAnsibleGalaxy = path;
+                break;
+            }
+        }
+        
+        if (workingAnsibleGalaxy == null)
+        {
+            Console.WriteLine("✗ MISSING");
+            Console.WriteLine();
+            Console.WriteLine("ansible-galaxy command not found.");
+            Console.WriteLine("Please run: love2automate-ada --setup-deps");
+            return 1;
+        }
+        
+        // Check for each collection individually since the combined command might fail
+        var communityCheck = await ExecuteCommand(workingAnsibleGalaxy, "collection list community.general", suppressOutput: true);
+        var posixCheck = await ExecuteCommand(workingAnsibleGalaxy, "collection list ansible.posix", suppressOutput: true);
+        
+        if (communityCheck.ExitCode != 0 || posixCheck.ExitCode != 0)
+        {
+            Console.WriteLine("✗ MISSING");
+            Console.WriteLine();
+            if (communityCheck.ExitCode != 0)
+                Console.WriteLine("Missing: community.general collection");
+            if (posixCheck.ExitCode != 0)
+                Console.WriteLine("Missing: ansible.posix collection");
+            Console.WriteLine("Please run: love2automate-ada --setup-deps");
+            return 1;
+        }
+        Console.WriteLine("✓ FOUND");
+
+        // Check 3: Ansible files setup
+        Console.Write("Checking Ansible files... ");
+        var appDir = "/opt/love2automate-ada";
+        var buildYmlPath = Path.Combine(appDir, "Build.yml");
+        var inventoryPath = Path.Combine(appDir, "inventory.ini");
+        
+        if (!Directory.Exists(appDir) || !File.Exists(buildYmlPath))
+        {
+            Console.WriteLine("✗ NOT FOUND");
+            Console.WriteLine();
+            Console.WriteLine("Ansible playbook files are not installed.");
+            Console.WriteLine("Please run: love2automate-ada --setup");
+            return 1;
+        }
+        Console.WriteLine("✓ FOUND");
+
+        // Check 4: Inventory file
+        Console.Write("Checking inventory.ini... ");
+        if (!File.Exists(inventoryPath))
+        {
+            Console.WriteLine("✗ NOT FOUND");
+            Console.WriteLine();
+            Console.WriteLine("Inventory file is missing. Please create inventory.ini in /opt/love2automate-ada/");
+            Console.WriteLine("Example content:");
+            Console.WriteLine("[cardano_nodes]");
+            Console.WriteLine("localhost ansible_connection=local");
+            return 1;
+        }
+        
+        // Check if inventory file has content
+        var inventoryContent = await File.ReadAllTextAsync(inventoryPath);
+        if (string.IsNullOrWhiteSpace(inventoryContent) || inventoryContent.Trim().StartsWith("#"))
+        {
+            Console.WriteLine("✗ EMPTY");
+            Console.WriteLine();
+            Console.WriteLine("Inventory file exists but appears to be empty or only contains comments.");
+            Console.WriteLine("Please configure inventory.ini in /opt/love2automate-ada/");
+            Console.WriteLine("Example content:");
+            Console.WriteLine("[cardano_nodes]");
+            Console.WriteLine("localhost ansible_connection=local");
+            return 1;
+        }
+        Console.WriteLine("✓ CONFIGURED");
+
+        Console.WriteLine("✓ All prerequisites satisfied!");
+        Console.WriteLine();
+        return 0;
+    }
+
     private static bool CanWriteToDirectory(string path)
     {
         try
@@ -326,25 +736,12 @@ public class Program
             return 1;
         }
 
-        // Check if we can run sudo without password
-        var sudoCheck = await ExecuteCommand("sudo", "-n true");
-        string arguments;
-        
-        if (sudoCheck.ExitCode == 0)
-        {
-            // Can run sudo without password
-            arguments = $"-i {inventoryPath} -e @{paramPath} {playbookPath}";
-        }
-        else
-        {
-            // Need to prompt for password
-            arguments = $"-i {inventoryPath} -e @{paramPath} --ask-become-pass {playbookPath}";
-            Console.WriteLine("Note: This playbook requires sudo privileges. You will be prompted for your password.");
-        }
-
+        // Always use --ask-become-pass for safety since playbooks require sudo
+        string arguments = $"-i {inventoryPath} -e @{paramPath} --ask-become-pass {playbookPath}";
+        Console.WriteLine("Note: This playbook requires sudo privileges. You will be prompted for your password.");
         Console.WriteLine($"Executing: ansible-playbook {arguments}");
 
-        var result = await ExecuteCommand("ansible-playbook", arguments);
+        var result = await ExecuteCommandInteractive("ansible-playbook", arguments);
         
         if (result.ExitCode == 0)
         {
@@ -362,7 +759,7 @@ public class Program
         return result.ExitCode;
     }
 
-    private static async Task<(int ExitCode, string Output, string Error)> ExecuteCommand(string command, string arguments)
+    private static async Task<(int ExitCode, string Output, string Error)> ExecuteCommand(string command, string arguments, bool suppressOutput = false)
     {
         var processStartInfo = new ProcessStartInfo
         {
@@ -386,7 +783,8 @@ public class Program
             {
                 if (!string.IsNullOrEmpty(e.Data))
                 {
-                    Console.WriteLine(e.Data);
+                    if (!suppressOutput)
+                        Console.WriteLine(e.Data);
                     outputBuilder.AppendLine(e.Data);
                 }
             };
@@ -395,7 +793,8 @@ public class Program
             {
                 if (!string.IsNullOrEmpty(e.Data))
                 {
-                    Console.Error.WriteLine(e.Data);
+                    if (!suppressOutput)
+                        Console.Error.WriteLine(e.Data);
                     errorBuilder.AppendLine(e.Data);
                 }
             };
@@ -407,6 +806,36 @@ public class Program
             await process.WaitForExitAsync();
 
             return (process.ExitCode, outputBuilder.ToString(), errorBuilder.ToString());
+        }
+        catch (Exception ex)
+        {
+            if (!suppressOutput)
+                Console.WriteLine($"Error executing command '{command} {arguments}': {ex.Message}");
+            return (1, "", ex.Message);
+        }
+    }
+
+    private static async Task<(int ExitCode, string Output, string Error)> ExecuteCommandInteractive(string command, string arguments)
+    {
+        var processStartInfo = new ProcessStartInfo
+        {
+            FileName = command,
+            Arguments = arguments,
+            UseShellExecute = false,
+            CreateNoWindow = false,
+            RedirectStandardOutput = false,
+            RedirectStandardError = false,
+            RedirectStandardInput = false
+        };
+
+        using var process = new Process { StartInfo = processStartInfo };
+        
+        try
+        {
+            process.Start();
+            await process.WaitForExitAsync();
+
+            return (process.ExitCode, "", "");
         }
         catch (Exception ex)
         {
