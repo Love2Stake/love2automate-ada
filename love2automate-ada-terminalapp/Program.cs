@@ -482,32 +482,13 @@ public class Program
             await ExecuteCommand("sudo", "systemctl stop cardano-node");
             await ExecuteCommand("sudo", "systemctl disable cardano-node");
 
-            // Remove cardano-node binaries and data
-            Console.WriteLine("Removing Cardano node files...");
-            await ExecuteCommand("sudo", "rm -rf /usr/local/bin/cardano-*");
-            await ExecuteCommand("sudo", "rm -rf /opt/cardano");
-            await ExecuteCommand("sudo", "rm -rf ~/.local/share/cardano-node");
-            await ExecuteCommand("sudo", "rm -rf /etc/systemd/system/cardano-node.service");
-
-            // Remove GHCup and Haskell
-            Console.WriteLine("Removing GHCup and Haskell...");
-            await ExecuteCommand("rm", "-rf ~/.ghcup");
-            await ExecuteCommand("rm", "-rf ~/.cabal");
-            await ExecuteCommand("rm", "-rf ~/.stack");
-
-            // Remove build dependencies
-            Console.WriteLine("Removing build dependencies...");
-            await ExecuteCommand("sudo", "apt remove -y build-essential pkg-config libffi-dev libgmp-dev libssl-dev libtinfo-dev libsystemd-dev zlib1g-dev make g++ tmux git jq wget libncursesw5 libtool autoconf");
-            await ExecuteCommand("sudo", "apt autoremove -y");
-
-            // Remove custom libraries
-            Console.WriteLine("Removing custom libraries...");
-            await ExecuteCommand("sudo", "rm -rf /usr/local/lib/libsodium*");
-            await ExecuteCommand("sudo", "rm -rf /usr/local/include/sodium*");
-            await ExecuteCommand("sudo", "rm -rf /usr/local/lib/libsecp256k1*");
-            await ExecuteCommand("sudo", "rm -rf /usr/local/include/secp256k1*");
-            await ExecuteCommand("sudo", "rm -rf /usr/local/lib/libblst*");
-            await ExecuteCommand("sudo", "rm -rf /usr/local/include/blst*");
+            // Run the Uninstall.yml playbook to properly remove Cardano node
+            Console.WriteLine("Running Uninstall.yml playbook...");
+            var uninstallResult = await ExecuteAnsiblePlaybook("Uninstall.yml", "uninstall-steps/uninstall_param.yml");
+            if (uninstallResult != 0)
+            {
+                Console.WriteLine("⚠️  Uninstall playbook failed, but continuing with cleanup...");
+            }
 
             // Remove ansible files
             Console.WriteLine("Removing Ansible files...");
@@ -592,11 +573,9 @@ public class Program
         }
         Console.WriteLine("✓ FOUND");
 
-        // Check 2: Required Ansible collections (TEMPORARILY COMMENTED OUT)
+        // Check 2: Required Ansible collections
         Console.Write("Checking Ansible collections... ");
-        Console.WriteLine("✓ SKIPPED (temporarily disabled)");
         
-        /*
         // Try to find ansible-galaxy in common locations
         var ansibleGalaxyPaths = new[]
         {
@@ -625,17 +604,22 @@ public class Program
             return 1;
         }
         
-        var collectionsCheck = await ExecuteCommand(workingAnsibleGalaxy, "collection list community.general ansible.posix", suppressOutput: true);
-        if (collectionsCheck.ExitCode != 0)
+        // Check for each collection individually since the combined command might fail
+        var communityCheck = await ExecuteCommand(workingAnsibleGalaxy, "collection list community.general", suppressOutput: true);
+        var posixCheck = await ExecuteCommand(workingAnsibleGalaxy, "collection list ansible.posix", suppressOutput: true);
+        
+        if (communityCheck.ExitCode != 0 || posixCheck.ExitCode != 0)
         {
             Console.WriteLine("✗ MISSING");
             Console.WriteLine();
-            Console.WriteLine("Required Ansible collections are not installed.");
+            if (communityCheck.ExitCode != 0)
+                Console.WriteLine("Missing: community.general collection");
+            if (posixCheck.ExitCode != 0)
+                Console.WriteLine("Missing: ansible.posix collection");
             Console.WriteLine("Please run: love2automate-ada --setup-deps");
             return 1;
         }
         Console.WriteLine("✓ FOUND");
-        */
 
         // Check 3: Ansible files setup
         Console.Write("Checking Ansible files... ");
@@ -745,23 +729,10 @@ public class Program
             return 1;
         }
 
-        // Check if we can run sudo without password
-        var sudoCheck = await ExecuteCommand("sudo", "-n true", suppressOutput: true);
-        string arguments;
-        
-        if (sudoCheck.ExitCode == 0)
-        {
-            // Can run sudo without password
-            arguments = $"-i {inventoryPath} -e @{paramPath} {playbookPath}";
-            Console.WriteLine($"Executing: ansible-playbook {arguments}");
-        }
-        else
-        {
-            // Need to prompt for password
-            arguments = $"-i {inventoryPath} -e @{paramPath} --ask-become-pass {playbookPath}";
-            Console.WriteLine("Note: This playbook requires sudo privileges. You will be prompted for your password.");
-            Console.WriteLine($"Executing: ansible-playbook {arguments}");
-        }
+        // Always use --ask-become-pass for safety since playbooks require sudo
+        string arguments = $"-i {inventoryPath} -e @{paramPath} --ask-become-pass {playbookPath}";
+        Console.WriteLine("Note: This playbook requires sudo privileges. You will be prompted for your password.");
+        Console.WriteLine($"Executing: ansible-playbook {arguments}");
 
         var result = await ExecuteCommandInteractive("ansible-playbook", arguments);
         
