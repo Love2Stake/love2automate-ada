@@ -119,25 +119,33 @@
             executable: /bin/bash
 
         - name: Cabal update
-          shell: "{{ user_home }}/.ghcup/bin/cabal update"
+          shell: |
+            source {{ user_home }}/.ghcup/env
+            cabal update
           args:
             chdir: "{{ user_home }}/git/cardano-node"
             executable: /bin/bash
 
         - name: Cabal configure for build
-          shell: "{{ user_home }}/.ghcup/bin/cabal configure -O0 -w ghc-{{ ghc_version }}"
+          shell: |
+            source {{ user_home }}/.ghcup/env
+            cabal configure -O0 -w ghc-{{ ghc_version }}
           args:
             chdir: "{{ user_home }}/git/cardano-node"
             executable: /bin/bash
 
         - name: Cabal build all
-          shell: "{{ user_home }}/.ghcup/bin/cabal build all"
+          shell: |
+            source {{ user_home }}/.ghcup/env
+            cabal build all
           args:
             chdir: "{{ user_home }}/git/cardano-node"
             executable: /bin/bash
 
         - name: Cabal build cardano-cli
-          shell: "{{ user_home }}/.ghcup/bin/cabal build cardano-cli"
+          shell: |
+            source {{ user_home }}/.ghcup/env
+            cabal build cardano-cli
           args:
             chdir: "{{ user_home }}/git/cardano-node"
             executable: /bin/bash
