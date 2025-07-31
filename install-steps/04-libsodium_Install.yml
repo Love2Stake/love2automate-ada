@@ -29,28 +29,24 @@
         executable: /bin/bash
 
     - name: Configure libsodium
-      command: ./configure >> {{ log_file }} 2>&1
+      shell: ./configure >> {{ log_file }} 2>&1
       args:
         chdir: "{{ user_home }}/git/libsodium"
-        executable: /bin/bash
 
     - name: Build libsodium
-      command: make >> {{ log_file }} 2>&1
+      shell: make >> {{ log_file }} 2>&1
       args:
         chdir: "{{ user_home }}/git/libsodium"
-        executable: /bin/bash
 
     - name: Run tests (make check)
-      command: make check >> {{ log_file }} 2>&1
+      shell: make check >> {{ log_file }} 2>&1
       args:
         chdir: "{{ user_home }}/git/libsodium"
-        executable: /bin/bash
 
     - name: Install libsodium
-      command: make install >> {{ log_file }} 2>&1
+      shell: make install >> {{ log_file }} 2>&1
       args:
         chdir: "{{ user_home }}/git/libsodium"
-        executable: /bin/bash
       become: yes
 
     - name: Update shared library cache
