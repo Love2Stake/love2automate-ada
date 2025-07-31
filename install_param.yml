@@ -13,7 +13,7 @@ timezone_setting: Europe/London
 
 ################################################################
 # GHC version
-ghc_version: "9.2.7"
+ghc_version: "9.6.7"
 # Cabal version
 cabal_version: "3.12.1.0"
 # libsodium version
