@@ -66,6 +66,7 @@
 
           [Install]
           WantedBy          = multi-user.target
+      become: yes
 
 #    - name: Reload systemd to apply new service
 #      shell: systemctl daemon-reload

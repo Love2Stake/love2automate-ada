@@ -43,13 +43,24 @@ public class Program
         var completeRemovalOption = new Option<bool>(new[] { "--remove-all" }, "Completely remove all installed components and dependencies");
         rootCommand.AddOption(completeRemovalOption);
 
-        rootCommand.SetHandler(HandleCommand, targetArgument, installOption, uninstallOption, statusOption, setupOption, setupDepsOption, completeRemovalOption);
+        // Port option
+        var portOption = new Option<int?>(new[] { "--port", "-p" }, "Port number for Cardano node (updates install_param.yml)");
+        rootCommand.AddOption(portOption);
+
+        rootCommand.SetHandler(HandleCommand, targetArgument, installOption, uninstallOption, statusOption, setupOption, setupDepsOption, completeRemovalOption, portOption);
 
         return await rootCommand.InvokeAsync(args);
     }
 
-    private static async Task<int> HandleCommand(string? target, bool install, bool uninstall, bool status, bool setup, bool setupDeps, bool removeAll)
+    private static async Task<int> HandleCommand(string? target, bool install, bool uninstall, bool status, bool setup, bool setupDeps, bool removeAll, int? port)
     {
+        // Validate that --port is only used with --install
+        if (port.HasValue && !install)
+        {
+            Console.WriteLine("✗ The --port parameter can only be used with the --install operation.");
+            return 1;
+        }
+
         // Count how many options are set
         int optionCount = (install ? 1 : 0) + (uninstall ? 1 : 0) + (status ? 1 : 0) + (setup ? 1 : 0) + (setupDeps ? 1 : 0) + (removeAll ? 1 : 0);
         
@@ -72,7 +83,7 @@ public class Program
                 Console.WriteLine("Target is required for install operation. Available targets: cardano-node");
                 return 1;
             }
-            return await HandleInstall(target);
+            return await HandleInstall(target, port);
         }
         else if (uninstall)
         {
@@ -107,7 +118,7 @@ public class Program
         return 1;
     }
 
-    private static async Task<int> HandleInstall(string target)
+    private static async Task<int> HandleInstall(string target, int? port = null)
     {
         Console.WriteLine($"Installing {target}...");
         
@@ -120,7 +131,8 @@ public class Program
         
         if (target.ToLower() == "cardano-node")
         {
-            return await ExecuteAnsiblePlaybook("Build.yml", "install_param.yml");
+            var paramFile = await PrepareParameterFile("install_param.yml", port);
+            return await ExecuteAnsiblePlaybook("Build.yml", paramFile);
         }
         
         Console.WriteLine($"Unknown target: {target}");
@@ -858,5 +870,65 @@ public class Program
         }
         
         return appDir;
+    }
+
+    private static async Task<string> PrepareParameterFile(string baseParameterFile, int? port = null)
+    {
+        var projectRoot = GetProjectRoot();
+        var baseParamPath = Path.Combine(projectRoot, baseParameterFile);
+
+        if (!File.Exists(baseParamPath))
+        {
+            throw new FileNotFoundException($"Base parameter file not found: {baseParamPath}");
+        }
+
+        // If no custom parameters are specified, use the original file
+        if (!port.HasValue)
+        {
+            return baseParameterFile;
+        }
+
+        // Validate port if specified
+        if (port.HasValue && (port.Value < 1 || port.Value > 65535))
+        {
+            throw new ArgumentException("Port must be between 1 and 65535");
+        }
+
+        // Create custom parameter file in a temporary directory that's user-writable
+        var tempDir = Path.GetTempPath();
+        var customParamFile = $"install_param_custom_{DateTime.Now:yyyyMMdd_HHmmss}.yml";
+        var customParamPath = Path.Combine(tempDir, customParamFile);
+
+        Console.WriteLine($"Creating custom parameter file: {customParamPath}");
+
+        try
+        {
+            var content = await File.ReadAllTextAsync(baseParamPath);
+            var lines = content.Split('\n');
+
+            for (int i = 0; i < lines.Length; i++)
+            {
+                if (port.HasValue && lines[i].TrimStart().StartsWith("cardano_port:"))
+                {
+                    var indentation = lines[i].Substring(0, lines[i].Length - lines[i].TrimStart().Length);
+                    lines[i] = $"{indentation}cardano_port: {port.Value}";
+                    Console.WriteLine($"✓ Updated port to {port.Value}");
+                }
+            }
+
+            await File.WriteAllTextAsync(customParamPath, string.Join('\n', lines));
+            Console.WriteLine($"✓ Custom parameter file created: {customParamPath}");
+            
+            return customParamPath; // Return full path since it's now in temp directory
+        }
+        catch (Exception ex)
+        {
+            // Clean up the file if creation failed
+            if (File.Exists(customParamPath))
+            {
+                try { File.Delete(customParamPath); } catch { }
+            }
+            throw new Exception($"Failed to create custom parameter file: {ex.Message}");
+        }
     }
 }
