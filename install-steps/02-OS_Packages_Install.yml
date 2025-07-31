@@ -24,7 +24,7 @@
           - jq
           - libffi-dev
           - libgmp-dev
-          - libncurses5w
+          - libncursesw5
           - libssl-dev
           - libsystemd-dev
           - libtinfo-dev

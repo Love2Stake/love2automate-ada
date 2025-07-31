@@ -23,10 +23,9 @@
         force: yes
 
     - name: Run autogen.sh
-      command: ./autogen.sh
+      shell: ./autogen.sh
       args:
         chdir: "{{ user_home }}/git/libsodium"
-        executable: /bin/bash
 
     - name: Configure libsodium
       shell: ./configure >> {{ log_file }} 2>&1
