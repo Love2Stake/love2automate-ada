@@ -132,7 +132,15 @@ public class Program
         if (target.ToLower() == "cardano-node")
         {
             var paramFile = await PrepareParameterFile("install_param.yml", port);
-            return await ExecuteAnsiblePlaybook("Build.yml", paramFile);
+            var result = await ExecuteAnsiblePlaybook("Build.yml", paramFile);
+            
+            // Store configuration after successful installation
+            if (result == 0)
+            {
+                await StoreInstallationConfig(port);
+            }
+            
+            return result;
         }
         
         Console.WriteLine($"Unknown target: {target}");
@@ -193,6 +201,9 @@ public class Program
     {
         Console.WriteLine("Checking Cardano node status...");
         
+        // Get the configured port
+        var configuredPort = await GetConfiguredPort();
+        
         // Check if cardano-node process is running
         var result = await ExecuteCommand("pgrep", "-f cardano-node");
         
@@ -201,11 +212,15 @@ public class Program
             Console.WriteLine("✓ Cardano node is running");
             Console.WriteLine($"Process ID: {result.Output.Trim()}");
             
-            // Additional status checks could go here
-            var portCheck = await ExecuteCommand("netstat", "-tuln | grep :6002");
+            // Check if the configured port is listening
+            var portCheck = await ExecuteCommand("netstat", $"-tuln | grep :{configuredPort}");
             if (portCheck.ExitCode == 0)
             {
-                Console.WriteLine("✓ Port 6002 is listening");
+                Console.WriteLine($"✓ Port {configuredPort} is listening");
+            }
+            else
+            {
+                Console.WriteLine($"⚠️  Port {configuredPort} is not listening (node may be starting up)");
             }
         }
         else
@@ -213,6 +228,7 @@ public class Program
             Console.WriteLine("✗ Cardano node is not running");
         }
         
+        Console.WriteLine($"Configured port: {configuredPort}");
         return 0;
     }
 
@@ -930,5 +946,104 @@ public class Program
             }
             throw new Exception($"Failed to create custom parameter file: {ex.Message}");
         }
+    }
+
+    private static async Task StoreInstallationConfig(int? port)
+    {
+        try
+        {
+            var homeDir = Environment.GetEnvironmentVariable("HOME") ?? "/root";
+            var configDir = Path.Combine(homeDir, ".love2automate-ada");
+            var configFile = Path.Combine(configDir, "config.json");
+
+            // Create directory if it doesn't exist
+            Directory.CreateDirectory(configDir);
+
+            // Determine the actual port used
+            int actualPort = port ?? 6002; // Default to 6002 if no custom port was specified
+
+            var config = new
+            {
+                cardano_port = actualPort,
+                last_installation = DateTime.UtcNow.ToString("yyyy-MM-dd HH:mm:ss UTC")
+            };
+
+            var jsonContent = System.Text.Json.JsonSerializer.Serialize(config, new System.Text.Json.JsonSerializerOptions 
+            { 
+                WriteIndented = true 
+            });
+
+            await File.WriteAllTextAsync(configFile, jsonContent);
+            Console.WriteLine($"✓ Configuration saved (port: {actualPort})");
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"⚠️  Warning: Could not save configuration: {ex.Message}");
+        }
+    }
+
+    private static async Task<int> GetConfiguredPort()
+    {
+        try
+        {
+            var homeDir = Environment.GetEnvironmentVariable("HOME") ?? "/root";
+            var configFile = Path.Combine(homeDir, ".love2automate-ada", "config.json");
+
+            if (!File.Exists(configFile))
+            {
+                // Fall back to reading from the default parameter file
+                return await GetPortFromParameterFile();
+            }
+
+            var jsonContent = await File.ReadAllTextAsync(configFile);
+            using var doc = System.Text.Json.JsonDocument.Parse(jsonContent);
+            
+            if (doc.RootElement.TryGetProperty("cardano_port", out var portElement))
+            {
+                return portElement.GetInt32();
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"⚠️  Warning: Could not read stored configuration: {ex.Message}");
+        }
+
+        // Fall back to reading from parameter file
+        return await GetPortFromParameterFile();
+    }
+
+    private static async Task<int> GetPortFromParameterFile()
+    {
+        try
+        {
+            var projectRoot = GetProjectRoot();
+            var paramPath = Path.Combine(projectRoot, "install_param.yml");
+
+            if (!File.Exists(paramPath))
+            {
+                return 6002; // Default fallback
+            }
+
+            var content = await File.ReadAllTextAsync(paramPath);
+            var lines = content.Split('\n');
+
+            foreach (var line in lines)
+            {
+                if (line.TrimStart().StartsWith("cardano_port:"))
+                {
+                    var parts = line.Split(':', 2);
+                    if (parts.Length == 2 && int.TryParse(parts[1].Trim(), out int port))
+                    {
+                        return port;
+                    }
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"⚠️  Warning: Could not read parameter file: {ex.Message}");
+        }
+
+        return 6002; // Default fallback
     }
 }
