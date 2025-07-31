@@ -27,7 +27,7 @@ blst_version: "v0.3.0"
 cardano_node_version: "10.4.1"
 
 # Install method build or download
-install_method: "build" # Options: build or download
+install_method: "download" # Options: build or download
 
 # Cardano node directory name
 cardano_node_dir: "cardano-my-node"
