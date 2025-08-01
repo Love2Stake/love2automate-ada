@@ -17,6 +17,7 @@
         name:
           - autoconf
           - automake
+          - bc
           - build-essential
           - curl
           - g++
