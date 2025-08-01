@@ -68,14 +68,14 @@
           WantedBy          = multi-user.target
       become: yes
 
-#    - name: Reload systemd to apply new service
-#      shell: systemctl daemon-reload
-#      become: yes
+    - name: Reload systemd to apply new service
+      shell: systemctl daemon-reload
+      become: yes
 
-#    - name: Enable cardano-node service
-#      shell: systemctl enable cardano-node.service
-#      become: yes
+    - name: Enable cardano-node service
+      shell: systemctl enable cardano-node.service
+      become: yes
 
-#    - name: Start cardano-node service
-#      shell: systemctl start cardano-node.service
-#      become: yes
+    - name: Start cardano-node service
+      shell: systemctl start cardano-node.service
+      become: yes
