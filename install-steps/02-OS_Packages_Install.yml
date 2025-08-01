@@ -12,7 +12,7 @@
         autoclean: yes
       become: yes
     
-    - name: Install required packages
+    - name: Install required packages (common)
       apt:
         name:
           - autoconf
@@ -24,7 +24,6 @@
           - jq
           - libffi-dev
           - libgmp-dev
-          - libncursesw5
           - libssl-dev
           - libsystemd-dev
           - libtinfo-dev
@@ -40,4 +39,18 @@
       retries: 3
       delay: 10
       until: install_result is succeeded
+      become: yes
+
+    - name: Install libncursesw5 for Ubuntu < 24.04
+      apt:
+        name: libncursesw5
+        state: present
+      when: ansible_distribution_version is version('24.04', '<')
+      become: yes
+
+    - name: Install libncursesw6 for Ubuntu >= 24.04
+      apt:
+        name: libncursesw6
+        state: present
+      when: ansible_distribution_version is version('24.04', '>=')
       become: yes      
