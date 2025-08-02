@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 set -e
 
-# Set Cardano node version (edit this variable for a different version)
-CARDANO_NODE_VERSION="10.5.1"
+# Use first argument as Cardano node version, or default to 10.5.1 if not provided
+CARDANO_NODE_VERSION="${1:-10.5.1}"
 
 echo "==> Cardano node version: $CARDANO_NODE_VERSION"
 echo
