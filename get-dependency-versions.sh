@@ -4,9 +4,6 @@ set -e
 # Use first argument as Cardano node version, or default to 10.5.1 if not provided
 CARDANO_NODE_VERSION="${1:-10.5.1}"
 
-# echo "==> Cardano node version: $CARDANO_NODE_VERSION"
-# echo
-
 # Create temporary files to cache downloaded flake.lock files
 NODE_FLAKE_TMP=$(mktemp)
 IOHKNIX_FLAKE_TMP=$(mktemp)
