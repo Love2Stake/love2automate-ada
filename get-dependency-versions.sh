@@ -31,40 +31,23 @@ SECP256K1_VERSION=$(jq -r '.nodes.secp256k1.original.ref' "$IOHKNIX_FLAKE_TMP") 
 BLST_VERSION=$(jq -r '.nodes.blst.original.ref' "$IOHKNIX_FLAKE_TMP") # Extract blst version ref from cached iohk-nix flake.lock
 
 # Get GHC and Cabal versions from release notes and store in variables
-readarray -t COMPILER_VERSIONS < <(
-  curl -s "https://api.github.com/repos/IntersectMBO/cardano-node/releases/tags/$CARDANO_NODE_VERSION" \
-    | jq -r '.body' \
-    | grep -i -E "ghc|cabal" \
-    | sed -nE 's/.*(ghc)[^0-9]*([0-9]+\.[0-9]+(\.[0-9]+)?).*/GHC: \2/I p; s/.*(cabal)[^0-9]*([0-9]+(\.[0-9]+)?(\.[0-9]+)?).*/Cabal: \2/I p'
-)
+RELEASE_BODY=$(curl -s "https://api.github.com/repos/IntersectMBO/cardano-node/releases/tags/$CARDANO_NODE_VERSION" | jq -r '.body')
 
-# Initialize variables
-GHC_VERSION=""
-CABAL_VERSION=""
+# Try to find GHC and Cabal on separate lines first
+GHC_VERSION=$(echo "$RELEASE_BODY" | grep -iE '^.*ghc[^0-9]*([0-9]+\.[0-9]+(\.[0-9]+)?)' | sed -nE 's/.*ghc[^0-9]*([0-9]+\.[0-9]+(\.[0-9]+)?).*/\1/Ip' | head -1)
+CABAL_VERSION=$(echo "$RELEASE_BODY" | grep -iE '^.*cabal[^0-9]*([0-9]+\.[0-9]+(\.[0-9]+)?(\.[0-9]+)?).*' | sed -nE 's/.*cabal[^0-9]*([0-9]+\.[0-9]+(\.[0-9]+)?(\.[0-9]+)?).*/\1/Ip' | head -1)
 
-# Assign the versions
-for line in "${COMPILER_VERSIONS[@]}"; do
-  if [[ "$line" =~ ^GHC:\ (.+)$ ]]; then
-    GHC_VERSION="${BASH_REMATCH[1]}"
-  elif [[ "$line" =~ ^Cabal:\ (.+)$ ]]; then
-    if [[ -z "$CABAL_VERSION" ]]; then
-      CABAL_VERSION="${BASH_REMATCH[1]}"
-    else
-      CABAL_VERSION="$CABAL_VERSION ${BASH_REMATCH[1]}"
-    fi
+# If either is empty, try to find lines with GHC/Cabal combined
+if [[ -z "$GHC_VERSION" || -z "$CABAL_VERSION" ]]; then
+  # Search for lines like "GHC 8.10.7/Cabal 3.8.1.0"
+  COMBINED_LINE=$(echo "$RELEASE_BODY" | grep -iE 'ghc[[:space:]]*[0-9]+\.[0-9]+(\.[0-9]+)?[[:space:]]*/[[:space:]]*cabal[[:space:]]*[0-9]+\.[0-9]+(\.[0-9]+)?(\.[0-9]+)?')
+  if [[ -n "$COMBINED_LINE" ]]; then
+    GHC_VERSION_ALT=$(echo "$COMBINED_LINE" | sed -nE 's/.*ghc[[:space:]]*([0-9]+\.[0-9]+(\.[0-9]+)?).*/\1/Ip')
+    CABAL_VERSION_ALT=$(echo "$COMBINED_LINE" | sed -nE 's/.*cabal[[:space:]]*([0-9]+\.[0-9]+(\.[0-9]+)?(\.[0-9]+)?).*/\1/Ip')
+    [[ -z "$GHC_VERSION" ]] && GHC_VERSION="$GHC_VERSION_ALT"
+    [[ -z "$CABAL_VERSION" ]] && CABAL_VERSION="$CABAL_VERSION_ALT"
   fi
-done
-
-# echo "==> Dependencies versions"
-# cat <<EOF
-# cardano-node:   $CARDANO_NODE_VERSION
-# iohk-nix:       $IOHKNIX_VERSION
-# libsodium:      $SODIUM_VERSION
-# secp256k1:      $SECP256K1_VERSION
-# blst:           $BLST_VERSION
-# GHC:            $GHC_VERSION
-# Cabal:          $CABAL_VERSION
-# EOF
+fi
 
 # Write JSON output to /tmp/cardano_node_${CARDANO_NODE_VERSION}_deps_version.json
 JSON_FILE="/tmp/cardano_node_${CARDANO_NODE_VERSION}_deps_version.json"
