@@ -4,8 +4,8 @@ set -e
 # Use first argument as Cardano node version, or default to 10.5.1 if not provided
 CARDANO_NODE_VERSION="${1:-10.5.1}"
 
-echo "==> Cardano node version: $CARDANO_NODE_VERSION"
-echo
+# echo "==> Cardano node version: $CARDANO_NODE_VERSION"
+# echo
 
 # Create temporary files to cache downloaded flake.lock files
 NODE_FLAKE_TMP=$(mktemp)
@@ -17,8 +17,11 @@ cleanup() {
 }
 trap cleanup EXIT
 
-# Download Cardano node flake.lock
-curl -s -o "$NODE_FLAKE_TMP" "https://raw.githubusercontent.com/IntersectMBO/cardano-node/$CARDANO_NODE_VERSION/flake.lock"
+URL="https://raw.githubusercontent.com/IntersectMBO/cardano-node/$CARDANO_NODE_VERSION/flake.lock"
+if ! curl -sfLo "$NODE_FLAKE_TMP" "$URL"; then
+  echo "ERROR: flake.lock not found at $URL (possibly 404 not found)"
+  exit 1
+fi
 
 # Extract iohk-nix version commit hash from cached node flake.lock
 IOHKNIX_VERSION=$(jq -r '.nodes.iohkNix.locked.rev' "$NODE_FLAKE_TMP")
@@ -70,3 +73,4 @@ jq -n \
     "cabal": $cabal
   }' > "$JSON_FILE"
 echo "Dependency versions written to: $JSON_FILE"
+exit 0
