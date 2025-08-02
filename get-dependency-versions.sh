@@ -22,23 +22,13 @@ curl -s -o "$NODE_FLAKE_TMP" "https://raw.githubusercontent.com/IntersectMBO/car
 
 # Extract iohk-nix version commit hash from cached node flake.lock
 IOHKNIX_VERSION=$(jq -r '.nodes.iohkNix.locked.rev' "$NODE_FLAKE_TMP")
-echo "iohk-nix version: $IOHKNIX_VERSION"
 
 # Download iohk-nix flake.lock using cached iohk-nix version
 curl -s -o "$IOHKNIX_FLAKE_TMP" "https://raw.githubusercontent.com/input-output-hk/iohk-nix/$IOHKNIX_VERSION/flake.lock"
 
-# Extract libsodium version commit hash from cached iohk-nix flake.lock
-SODIUM_VERSION=$(jq -r '.nodes.sodium.original.rev' "$IOHKNIX_FLAKE_TMP")
-echo "libsodium version: $SODIUM_VERSION"
-
-# Extract secp256k1 version tag from cached iohk-nix flake.lock
-SECP256K1_VERSION=$(jq -r '.nodes.secp256k1.original.ref' "$IOHKNIX_FLAKE_TMP")
-echo "secp256k1 version: $SECP256K1_VERSION"
-
-# Extract blst version ref from cached iohk-nix flake.lock
-BLST_VERSION=$(jq -r '.nodes.blst.original.ref' "$IOHKNIX_FLAKE_TMP")
-echo "blst version: $BLST_VERSION"
-echo
+SODIUM_VERSION=$(jq -r '.nodes.sodium.original.rev' "$IOHKNIX_FLAKE_TMP") # Extract libsodium version commit hash from cached iohk-nix flake.lock
+SECP256K1_VERSION=$(jq -r '.nodes.secp256k1.original.ref' "$IOHKNIX_FLAKE_TMP") # Extract secp256k1 version tag from cached iohk-nix flake.lock
+BLST_VERSION=$(jq -r '.nodes.blst.original.ref' "$IOHKNIX_FLAKE_TMP") # Extract blst version ref from cached iohk-nix flake.lock
 
 # Get GHC and Cabal versions from release notes and store in variables
 readarray -t COMPILER_VERSIONS < <(
@@ -65,13 +55,35 @@ for line in "${COMPILER_VERSIONS[@]}"; do
   fi
 done
 
-echo "==> Dependencies versions"
-cat <<EOF
-cardano-node:   $CARDANO_NODE_VERSION
-iohk-nix:       $IOHKNIX_VERSION
-libsodium:      $SODIUM_VERSION
-secp256k1:      $SECP256K1_VERSION
-blst:           $BLST_VERSION
-GHC:            $GHC_VERSION
-Cabal:          $CABAL_VERSION
-EOF
+# echo "==> Dependencies versions"
+# cat <<EOF
+# cardano-node:   $CARDANO_NODE_VERSION
+# iohk-nix:       $IOHKNIX_VERSION
+# libsodium:      $SODIUM_VERSION
+# secp256k1:      $SECP256K1_VERSION
+# blst:           $BLST_VERSION
+# GHC:            $GHC_VERSION
+# Cabal:          $CABAL_VERSION
+# EOF
+
+# Write JSON output to /tmp/cardano_node_${CARDANO_NODE_VERSION}_deps_version.json
+JSON_FILE="/tmp/cardano_node_${CARDANO_NODE_VERSION}_deps_version.json"
+
+jq -n \
+  --arg cardano_node "$CARDANO_NODE_VERSION" \
+  --arg iohk_nix "$IOHKNIX_VERSION" \
+  --arg libsodium "$SODIUM_VERSION" \
+  --arg secp256k1 "$SECP256K1_VERSION" \
+  --arg blst "$BLST_VERSION" \
+  --arg ghc "$GHC_VERSION" \
+  --arg cabal "$CABAL_VERSION" \
+  '{
+    "cardano-node": $cardano_node,
+    "iohk-nix": $iohk_nix,
+    "libsodium": $libsodium,
+    "secp256k1": $secp256k1,
+    "blst": $blst,
+    "ghc": $ghc,
+    "cabal": $cabal
+  }' > "$JSON_FILE"
+echo "Dependency versions written to: $JSON_FILE"
