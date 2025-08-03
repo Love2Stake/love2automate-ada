@@ -34,7 +34,7 @@ public class Program
         // Uninstall option
         var uninstallOption = new Option<bool>(new[] { "--uninstall", "-u" }, "Uninstall Cardano node components");
         rootCommand.AddOption(uninstallOption);
-        
+
         // Status option
         var statusOption = new Option<bool>(new[] { "--status", "-s" }, "Check status of Cardano node");
         rootCommand.AddOption(statusOption);
@@ -168,6 +168,10 @@ public class Program
                 await StoreInstallationConfig(port);
             }
             
+            Console.WriteLine();
+            Console.WriteLine("⚠️  IMPORTANT: You MUST restart your terminal or run 'source ~/.bashrc' for PATH changes to take effect.");
+            Console.WriteLine();
+
             return result;
         }
         
