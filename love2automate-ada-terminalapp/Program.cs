@@ -2,8 +2,20 @@ using System.CommandLine;
 using System.Diagnostics;
 using System.Net.Http;
 using System.IO.Compression;
+using System.Text.Json;
 
 namespace CardanoNodeManager;
+
+public class DependencyVersions
+{
+    public string? CardanoNodeVersion { get; set; }
+    public string? IohkNixVersion { get; set; }
+    public string? LibsodiumVersion { get; set; }
+    public string? Secp256k1Version { get; set; }
+    public string? BlstVersion { get; set; }
+    public string? GhcVersion { get; set; }
+    public string? CabalVersion { get; set; }
+}
 
 public class Program
 {
@@ -47,17 +59,48 @@ public class Program
         var portOption = new Option<int?>(new[] { "--port", "-p" }, "Port number for Cardano node (updates install_param.yml)");
         rootCommand.AddOption(portOption);
 
-        rootCommand.SetHandler(HandleCommand, targetArgument, installOption, uninstallOption, statusOption, setupOption, setupDepsOption, completeRemovalOption, portOption);
+        // Version option
+        var versionOption = new Option<string?>(new[] { "--cardano-version", "-cv" }, "Cardano node version to install (e.g., 10.4.1, 10.5.1)");
+        rootCommand.AddOption(versionOption);
+
+        rootCommand.SetHandler(async (context) =>
+        {
+            var target = context.ParseResult.GetValueForArgument(targetArgument);
+            var install = context.ParseResult.GetValueForOption(installOption);
+            var uninstall = context.ParseResult.GetValueForOption(uninstallOption);
+            var status = context.ParseResult.GetValueForOption(statusOption);
+            var setup = context.ParseResult.GetValueForOption(setupOption);
+            var setupDeps = context.ParseResult.GetValueForOption(setupDepsOption);
+            var removeAll = context.ParseResult.GetValueForOption(completeRemovalOption);
+            var port = context.ParseResult.GetValueForOption(portOption);
+            var version = context.ParseResult.GetValueForOption(versionOption);
+
+            context.ExitCode = await HandleCommand(target, install, uninstall, status, setup, setupDeps, removeAll, port, version);
+        });
 
         return await rootCommand.InvokeAsync(args);
     }
 
-    private static async Task<int> HandleCommand(string? target, bool install, bool uninstall, bool status, bool setup, bool setupDeps, bool removeAll, int? port)
+    private static async Task<int> HandleCommand(string? target, bool install, bool uninstall, bool status, bool setup, bool setupDeps, bool removeAll, int? port, string? version)
     {
         // Validate that --port is only used with --install
         if (port.HasValue && !install)
         {
             Console.WriteLine("✗ The --port parameter can only be used with the --install operation.");
+            return 1;
+        }
+
+        // Validate that --cardano-version is only used with --install
+        if (!string.IsNullOrEmpty(version) && !install)
+        {
+            Console.WriteLine("✗ The --cardano-version parameter can only be used with the --install operation.");
+            return 1;
+        }
+
+        // Validate version format if specified
+        if (!string.IsNullOrEmpty(version) && !IsValidVersionFormat(version))
+        {
+            Console.WriteLine("✗ Invalid version format. Please use format like: 10.4.1, 10.5.1, etc.");
             return 1;
         }
 
@@ -83,7 +126,7 @@ public class Program
                 Console.WriteLine("Target is required for install operation. Available targets: cardano-node");
                 return 1;
             }
-            return await HandleInstall(target, port);
+            return await HandleInstall(target, port, version);
         }
         else if (uninstall)
         {
@@ -118,7 +161,7 @@ public class Program
         return 1;
     }
 
-    private static async Task<int> HandleInstall(string target, int? port = null)
+    private static async Task<int> HandleInstall(string target, int? port = null, string? version = null)
     {
         Console.WriteLine($"Installing {target}...");
         
@@ -131,7 +174,7 @@ public class Program
         
         if (target.ToLower() == "cardano-node")
         {
-            var paramFile = await PrepareParameterFile("install_param.yml", port);
+            var paramFile = await PrepareParameterFile("install_param.yml", port, version);
             var result = await ExecuteAnsiblePlaybook("Build.yml", paramFile);
             
             // Store configuration after successful installation
@@ -888,7 +931,115 @@ public class Program
         return appDir;
     }
 
-    private static async Task<string> PrepareParameterFile(string baseParameterFile, int? port = null)
+    private static async Task<DependencyVersions?> GetDependencyVersions(string projectRoot, string? customVersion = null)
+    {
+        try
+        {
+            string cardanoNodeVersion;
+            
+            // Use custom version if provided, otherwise use the script's default (10.5.1)
+            if (!string.IsNullOrEmpty(customVersion))
+            {
+                cardanoNodeVersion = customVersion;
+                Console.WriteLine($"Using custom Cardano Node version: {cardanoNodeVersion}");
+            }
+            else
+            {
+                // Use the script's default version (10.5.1) - no need to read from install_param.yml
+                cardanoNodeVersion = "10.5.1";
+                Console.WriteLine($"Using default Cardano Node version: {cardanoNodeVersion}");
+            }
+
+            Console.WriteLine($"Fetching dependency versions for Cardano Node version {cardanoNodeVersion}...");
+
+            // Execute the get-dependency-versions.sh script
+            var scriptPath = Path.Combine(projectRoot, "get-dependency-versions.sh");
+            
+            if (!File.Exists(scriptPath))
+            {
+                Console.WriteLine($"⚠️  Warning: Dependency script not found at {scriptPath}");
+                return null;
+            }
+
+            // Make the script executable
+            await ExecuteCommand("chmod", $"+x {scriptPath}", suppressOutput: true);
+
+            // Execute the script with the cardano node version
+            var result = await ExecuteCommand("bash", $"{scriptPath} {cardanoNodeVersion}", suppressOutput: true);
+            
+            if (result.ExitCode != 0)
+            {
+                Console.WriteLine($"⚠️  Warning: Failed to fetch dependency versions: {result.Error}");
+                return null;
+            }
+
+            // Read the generated JSON file
+            var jsonFilePath = $"/tmp/cardano_node_{cardanoNodeVersion}_deps_version.json";
+            
+            if (!File.Exists(jsonFilePath))
+            {
+                Console.WriteLine($"⚠️  Warning: Expected JSON file not found at {jsonFilePath}");
+                return null;
+            }
+
+            var jsonContent = await File.ReadAllTextAsync(jsonFilePath);
+            
+            // Parse the JSON
+            using var doc = JsonDocument.Parse(jsonContent);
+            var root = doc.RootElement;
+
+            var versions = new DependencyVersions();
+            
+            if (root.TryGetProperty("cardano-node", out var cardanoNode))
+                versions.CardanoNodeVersion = cardanoNode.GetString();
+            
+            if (root.TryGetProperty("iohk-nix", out var iohkNix))
+                versions.IohkNixVersion = iohkNix.GetString();
+            
+            if (root.TryGetProperty("libsodium", out var libsodium))
+                versions.LibsodiumVersion = libsodium.GetString();
+            
+            if (root.TryGetProperty("secp256k1", out var secp256k1))
+                versions.Secp256k1Version = secp256k1.GetString();
+            
+            if (root.TryGetProperty("blst", out var blst))
+                versions.BlstVersion = blst.GetString();
+            
+            if (root.TryGetProperty("ghc", out var ghc))
+                versions.GhcVersion = ghc.GetString();
+            
+            if (root.TryGetProperty("cabal", out var cabal))
+                versions.CabalVersion = cabal.GetString();
+
+            Console.WriteLine("✓ Successfully fetched dependency versions");
+            
+            // Display fetched versions for user confirmation
+            if (!string.IsNullOrEmpty(versions.CardanoNodeVersion))
+                Console.WriteLine($"  • Cardano Node: {versions.CardanoNodeVersion}");
+            if (!string.IsNullOrEmpty(versions.GhcVersion))
+                Console.WriteLine($"  • GHC: {versions.GhcVersion}");
+            if (!string.IsNullOrEmpty(versions.CabalVersion))
+                Console.WriteLine($"  • Cabal: {versions.CabalVersion}");
+            if (!string.IsNullOrEmpty(versions.LibsodiumVersion))
+                Console.WriteLine($"  • libsodium: {versions.LibsodiumVersion}");
+            if (!string.IsNullOrEmpty(versions.Secp256k1Version))
+                Console.WriteLine($"  • secp256k1: {versions.Secp256k1Version}");
+            if (!string.IsNullOrEmpty(versions.BlstVersion))
+                Console.WriteLine($"  • blst: {versions.BlstVersion}");
+            
+            // Clean up the temporary JSON file
+            try { File.Delete(jsonFilePath); } catch { }
+            
+            return versions;
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"⚠️  Warning: Error fetching dependency versions: {ex.Message}");
+            return null;
+        }
+    }
+
+    private static async Task<string> PrepareParameterFile(string baseParameterFile, int? port = null, string? version = null)
     {
         var projectRoot = GetProjectRoot();
         var baseParamPath = Path.Combine(projectRoot, baseParameterFile);
@@ -898,18 +1049,16 @@ public class Program
             throw new FileNotFoundException($"Base parameter file not found: {baseParamPath}");
         }
 
-        // If no custom parameters are specified, use the original file
-        if (!port.HasValue)
-        {
-            return baseParameterFile;
-        }
-
         // Validate port if specified
         if (port.HasValue && (port.Value < 1 || port.Value > 65535))
         {
             throw new ArgumentException("Port must be between 1 and 65535");
         }
 
+        // Always fetch dependency versions and create a custom parameter file
+        Console.WriteLine("Fetching latest dependency versions...");
+        var dependencyVersions = await GetDependencyVersions(projectRoot, version);
+        
         // Create custom parameter file in a temporary directory that's user-writable
         var tempDir = Path.GetTempPath();
         var customParamFile = $"install_param_custom_{DateTime.Now:yyyyMMdd_HHmmss}.yml";
@@ -924,11 +1073,48 @@ public class Program
 
             for (int i = 0; i < lines.Length; i++)
             {
-                if (port.HasValue && lines[i].TrimStart().StartsWith("cardano_port:"))
+                var trimmedLine = lines[i].TrimStart();
+                var indentation = lines[i].Substring(0, lines[i].Length - trimmedLine.Length);
+
+                // Update port if specified
+                if (port.HasValue && trimmedLine.StartsWith("cardano_port:"))
                 {
-                    var indentation = lines[i].Substring(0, lines[i].Length - lines[i].TrimStart().Length);
                     lines[i] = $"{indentation}cardano_port: {port.Value}";
                     Console.WriteLine($"✓ Updated port to {port.Value}");
+                }
+                // Update dependency versions
+                else if (dependencyVersions != null)
+                {
+                    if (trimmedLine.StartsWith("ghc_version:") && !string.IsNullOrEmpty(dependencyVersions.GhcVersion))
+                    {
+                        lines[i] = $"{indentation}ghc_version: \"{dependencyVersions.GhcVersion}\"";
+                        Console.WriteLine($"✓ Updated GHC version to {dependencyVersions.GhcVersion}");
+                    }
+                    else if (trimmedLine.StartsWith("cabal_version:") && !string.IsNullOrEmpty(dependencyVersions.CabalVersion))
+                    {
+                        lines[i] = $"{indentation}cabal_version: \"{dependencyVersions.CabalVersion}\"";
+                        Console.WriteLine($"✓ Updated Cabal version to {dependencyVersions.CabalVersion}");
+                    }
+                    else if (trimmedLine.StartsWith("libsodium_version:") && !string.IsNullOrEmpty(dependencyVersions.LibsodiumVersion))
+                    {
+                        lines[i] = $"{indentation}libsodium_version: \"{dependencyVersions.LibsodiumVersion}\"";
+                        Console.WriteLine($"✓ Updated libsodium version to {dependencyVersions.LibsodiumVersion}");
+                    }
+                    else if (trimmedLine.StartsWith("secp256k1_version:") && !string.IsNullOrEmpty(dependencyVersions.Secp256k1Version))
+                    {
+                        lines[i] = $"{indentation}secp256k1_version: \"{dependencyVersions.Secp256k1Version}\"";
+                        Console.WriteLine($"✓ Updated secp256k1 version to {dependencyVersions.Secp256k1Version}");
+                    }
+                    else if (trimmedLine.StartsWith("blst_version:") && !string.IsNullOrEmpty(dependencyVersions.BlstVersion))
+                    {
+                        lines[i] = $"{indentation}blst_version: \"{dependencyVersions.BlstVersion}\"";
+                        Console.WriteLine($"✓ Updated blst version to {dependencyVersions.BlstVersion}");
+                    }
+                    else if (trimmedLine.StartsWith("cardano_node_version:") && !string.IsNullOrEmpty(dependencyVersions.CardanoNodeVersion))
+                    {
+                        lines[i] = $"{indentation}cardano_node_version: \"{dependencyVersions.CardanoNodeVersion}\"";
+                        Console.WriteLine($"✓ Updated Cardano Node version to {dependencyVersions.CardanoNodeVersion}");
+                    }
                 }
             }
 
@@ -1021,7 +1207,7 @@ public class Program
 
             if (!File.Exists(paramPath))
             {
-                return 6002; // Default fallback
+                return 6000; // Default fallback
             }
 
             var content = await File.ReadAllTextAsync(paramPath);
@@ -1045,5 +1231,25 @@ public class Program
         }
 
         return 6002; // Default fallback
+    }
+
+    private static bool IsValidVersionFormat(string version)
+    {
+        // Simple validation for version format like 10.4.1, 10.5.1, etc.
+        if (string.IsNullOrWhiteSpace(version))
+            return false;
+
+        // Check if it matches a basic version pattern (digits.digits.digits or digits.digits)
+        var parts = version.Split('.');
+        if (parts.Length < 2 || parts.Length > 3)
+            return false;
+
+        foreach (var part in parts)
+        {
+            if (!int.TryParse(part, out _))
+                return false;
+        }
+
+        return true;
     }
 }
