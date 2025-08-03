@@ -35,10 +35,6 @@ public class Program
         var uninstallOption = new Option<bool>(new[] { "--uninstall", "-u" }, "Uninstall Cardano node components");
         rootCommand.AddOption(uninstallOption);
 
-        // Upgrade option (COMMENTED OUT - NOT TESTED YET)
-        // var upgradeOption = new Option<bool>(new[] { "--upgrade", "-g" }, "Upgrade Cardano node components");
-        // rootCommand.AddOption(upgradeOption);
-
         // Status option
         var statusOption = new Option<bool>(new[] { "--status", "-s" }, "Check status of Cardano node");
         rootCommand.AddOption(statusOption);
@@ -137,18 +133,7 @@ public class Program
             }
             return await HandleUninstall(target);
         }
-        // UPGRADE FUNCTIONALITY COMMENTED OUT - NOT TESTED YET
-        /*
-        else if (upgrade)
-        {
-            if (string.IsNullOrEmpty(target))
-            {
-                Console.WriteLine("Target is required for upgrade operation. Available targets: cardano-node");
-                return 1;
-            }
-            return await HandleUpgrade(target);
-        }
-        */
+
         else if (status)
             return await HandleStatus();
         else if (setup)
@@ -183,6 +168,10 @@ public class Program
                 await StoreInstallationConfig(port);
             }
             
+            Console.WriteLine();
+            Console.WriteLine("⚠️  IMPORTANT: You MUST restart your terminal or run 'source ~/.bashrc' for PATH changes to take effect.");
+            Console.WriteLine();
+
             return result;
         }
         
@@ -211,35 +200,6 @@ public class Program
         Console.WriteLine("Available targets: cardano-node");
         return 1;
     }
-
-    // UPGRADE FUNCTIONALITY COMMENTED OUT - NOT TESTED YET
-    /*
-    private static async Task<int> HandleUpgrade(string target)
-    {
-        Console.WriteLine($"Upgrading {target}...");
-        
-        // Check prerequisites before proceeding
-        var prereqCheck = await CheckPrerequisites();
-        if (prereqCheck != 0)
-        {
-            return prereqCheck;
-        }
-        
-        if (target.ToLower() == "cardano-node")
-        {
-            Console.WriteLine("Upgrade functionality will execute upgrade steps...");
-            // For upgrade, we might want to run specific upgrade playbooks
-            Console.WriteLine("Note: Upgrade steps are available in upgrade-steps/ directory");
-            Console.WriteLine("Consider implementing specific upgrade playbook execution here");
-            return 0;
-        }
-        
-        Console.WriteLine($"Unknown target: {target}");
-        Console.WriteLine("Available targets: cardano-node");
-        return 1;
-    }
-    */
-
     private static async Task<int> HandleStatus()
     {
         Console.WriteLine("Checking Cardano node status...");

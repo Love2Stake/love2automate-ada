@@ -1,6 +1,53 @@
 #!/usr/bin/env bash
 set -e
 
+# Function to check if a command exists
+command_exists() {
+    command -v "$1" >/dev/null 2>&1
+}
+
+# Function to install missing dependencies
+install_dependencies() {
+    local missing_deps=()
+    
+    # Check for required dependencies
+    if ! command_exists curl; then
+        missing_deps+=("curl")
+    fi
+    
+    if ! command_exists jq; then
+        missing_deps+=("jq")
+    fi
+    
+    # Install missing dependencies if any
+    if [ ${#missing_deps[@]} -gt 0 ]; then
+        echo "Missing dependencies: ${missing_deps[*]}"
+        echo "Installing missing dependencies..."
+        
+        # Detect package manager and install
+        if command_exists apt-get; then
+            sudo apt-get update
+            sudo apt-get install -y "${missing_deps[@]}"
+        elif command_exists yum; then
+            sudo yum install -y "${missing_deps[@]}"
+        elif command_exists dnf; then
+            sudo dnf install -y "${missing_deps[@]}"
+        elif command_exists pacman; then
+            sudo pacman -S --noconfirm "${missing_deps[@]}"
+        elif command_exists brew; then
+            brew install "${missing_deps[@]}"
+        else
+            echo "ERROR: No supported package manager found. Please install manually: ${missing_deps[*]}"
+            exit 1
+        fi
+        
+        echo "Dependencies installed successfully!"
+    fi
+}
+
+# Check and install dependencies
+install_dependencies
+
 # Use first argument as Cardano node version, or default to 10.5.1 if not provided
 CARDANO_NODE_VERSION="${1:-10.5.1}"
 
