@@ -84,8 +84,8 @@
       file:
         path: "{{ user_home }}/cardano-my-node/{{ item }}"
         mode: '0644'
-        owner: "{{ ansible_user }}"
-        group: "{{ ansible_user }}"
+        owner: "{{ ansible_user_id }}"
+        group: "{{ ansible_user_gid }}"
       loop:
         - config.json
         - byron-genesis.json
