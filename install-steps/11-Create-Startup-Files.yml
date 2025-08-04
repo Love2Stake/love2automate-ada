@@ -1,4 +1,3 @@
----
 - name: Create Cardano node startup script
   hosts: localhost
   vars_files:

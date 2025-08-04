@@ -1,7 +1,5 @@
 - name: Install gLiveView.sh and env files
   hosts: localhost
-  vars_files:
-    - ../install_param.yml
 
   tasks:
     - name: Ensure cardano-my-node directory exists
@@ -22,3 +20,10 @@
         dest: "{{ user_home }}/cardano-my-node/env"
         mode:
         force: yes
+
+    - name: Configure CNODE_PORT in env file
+      lineinfile:
+        path: "{{ user_home }}/cardano-my-node/env"
+        regexp: '^#CNODE_PORT='
+        line: 'CNODE_PORT={{ cardano_port }}'
+        backup: yes
