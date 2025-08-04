@@ -77,6 +77,13 @@
         mode: '0644'
         force: yes
 
+    - name: Download mainnet checkpoint.json
+      get_url:
+        url: "https://book.play.dev.cardano.org/environments/mainnet/checkpoints.json"
+        dest: "{{ user_home }}/cardano-my-node/checkpoints.json"
+        mode: '0644'
+        force: yes
+
     - name: List downloaded configuration files
       find:
         paths: "{{ user_home }}/cardano-my-node"
@@ -99,6 +106,7 @@
         - alonzo-genesis.json
         - conway-genesis.json
         - topology.json
+        - checkpoints.json
 
     - name: Show configuration files status
       debug:
@@ -118,3 +126,4 @@
         - alonzo-genesis.json
         - conway-genesis.json
         - topology.json
+        - checkpoints.json
