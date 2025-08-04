@@ -17,6 +17,31 @@
         mode: '0644'
         force: yes
 
+    - name: Create logs directory for cardano node
+      file:
+        path: "{{ user_home }}/{{ cardano_node_dir }}/logs"
+        state: directory
+        mode: '0755'
+
+    - name: Read config.json content
+      slurp:
+        src: "{{ user_home }}/cardano-my-node/config.json"
+      register: config_content
+
+    - name: Parse config.json
+      set_fact:
+        config_json: "{{ config_content.content | b64decode | from_json }}"
+
+    - name: Update defaultScribes in config.json
+      set_fact:
+        updated_config: "{{ config_json | combine({'defaultScribes': [['FileSK', user_home + '/' + cardano_node_dir + '/logs/cardano-node.log'], ['StdoutSK', 'stdout']]}) }}"
+
+    - name: Write updated config.json
+      copy:
+        content: "{{ updated_config | to_nice_json }}"
+        dest: "{{ user_home }}/cardano-my-node/config.json"
+        mode: '0644'
+
     - name: Download mainnet byron-genesis.json
       get_url:
         url: "https://book.world.dev.cardano.org/environments/mainnet/byron-genesis.json"

@@ -169,6 +169,7 @@ public class Program
             }
             
             Console.WriteLine();
+            Console.WriteLine("⚠️  IMPORTANT: Configuration files automatically installed are designed for the latest version of a Cardano Node, if you intended for an older version, these configuration files may not work as intended.");
             Console.WriteLine("⚠️  IMPORTANT: You MUST restart your terminal or run 'source ~/.bashrc' for PATH changes to take effect.");
             Console.WriteLine();
 
