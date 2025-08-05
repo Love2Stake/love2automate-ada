@@ -7,7 +7,7 @@ username: "{{ ansible_user | default(ansible_env.USER) }}"
 # Setting home directory for the user
 user_home: "/home/{{ username }}"
 # Git directory (use cached fact from step 00, fallback to file lookup, then temp)
-git_dir: "{{ hostvars[inventory_hostname]['git_dir'] | default(lookup('file', user_home + '/.git_build_dir', errors='ignore') | trim) | default(user_home + '/git-temp') }}"
+git_dir: "{{ hostvars[inventory_hostname]['git_dir'] | default(lookup('file', /tmp + '/.git_build_dir', errors='ignore') | trim) | default(/tmp + '/git-temp') }}"
 # Log file for shell command output
 log_file: "{{ user_home }}/ansible-install.log"
 # Setting timezone
