@@ -1,0 +1,129 @@
+- name: Download and Install Cardano Configuration Files
+  hosts: localhost
+  vars_files:
+    - ../install_param.yml
+
+  tasks:
+    - name: Ensure cardano-my-node directory exists
+      file:
+        path: "{{ user_home }}/cardano-my-node"
+        state: directory
+        mode: '0755'
+
+    - name: Download mainnet config.json
+      get_url:
+        url: "https://book.play.dev.cardano.org/environments/mainnet/config.json"
+        dest: "{{ user_home }}/cardano-my-node/config.json"
+        mode: '0644'
+        force: yes
+
+    - name: Create logs directory for cardano node
+      file:
+        path: "{{ user_home }}/{{ cardano_node_dir }}/logs"
+        state: directory
+        mode: '0755'
+
+    - name: Read config.json content
+      slurp:
+        src: "{{ user_home }}/cardano-my-node/config.json"
+      register: config_content
+
+    - name: Parse config.json
+      set_fact:
+        config_json: "{{ config_content.content | b64decode | from_json }}"
+
+    - name: Update defaultScribes in config.json
+      set_fact:
+        updated_config: "{{ config_json | combine({'defaultScribes': [['FileSK', user_home + '/' + cardano_node_dir + '/logs/cardano-node.log'], ['StdoutSK', 'stdout']]}) }}"
+
+    - name: Write updated config.json
+      copy:
+        content: "{{ updated_config | to_nice_json }}"
+        dest: "{{ user_home }}/cardano-my-node/config.json"
+        mode: '0644'
+
+    - name: Download mainnet byron-genesis.json
+      get_url:
+        url: "https://book.world.dev.cardano.org/environments/mainnet/byron-genesis.json"
+        dest: "{{ user_home }}/cardano-my-node/byron-genesis.json"
+        mode: '0644'
+        force: yes
+
+    - name: Download mainnet shelley-genesis.json
+      get_url:
+        url: "https://book.world.dev.cardano.org/environments/mainnet/shelley-genesis.json"
+        dest: "{{ user_home }}/cardano-my-node/shelley-genesis.json"
+        mode: '0644'
+        force: yes
+
+    - name: Download mainnet alonzo-genesis.json
+      get_url:
+        url: "https://book.world.dev.cardano.org/environments/mainnet/alonzo-genesis.json"
+        dest: "{{ user_home }}/cardano-my-node/alonzo-genesis.json"
+        mode: '0644'
+        force: yes
+
+    - name: Download mainnet conway-genesis.json
+      get_url:
+        url: "https://book.world.dev.cardano.org/environments/mainnet/conway-genesis.json"
+        dest: "{{ user_home }}/cardano-my-node/conway-genesis.json"
+        mode: '0644'
+        force: yes
+
+    - name: Download mainnet topology.json
+      get_url:
+        url: "https://book.world.dev.cardano.org/environments/mainnet/topology.json"
+        dest: "{{ user_home }}/cardano-my-node/topology.json"
+        mode: '0644'
+        force: yes
+
+    - name: Download mainnet checkpoint.json
+      get_url:
+        url: "https://book.play.dev.cardano.org/environments/mainnet/checkpoints.json"
+        dest: "{{ user_home }}/cardano-my-node/checkpoints.json"
+        mode: '0644'
+        force: yes
+
+    - name: List downloaded configuration files
+      find:
+        paths: "{{ user_home }}/cardano-my-node"
+        patterns: "*.json"
+      register: config_files
+
+    - name: Display downloaded configuration files
+      debug:
+        msg: "Downloaded configuration file: {{ item.path }}"
+      loop: "{{ config_files.files }}"
+
+    - name: Verify all configuration files exist
+      stat:
+        path: "{{ user_home }}/cardano-my-node/{{ item }}"
+      register: file_check
+      loop:
+        - config.json
+        - byron-genesis.json
+        - shelley-genesis.json
+        - alonzo-genesis.json
+        - conway-genesis.json
+        - topology.json
+        - checkpoints.json
+
+    - name: Show configuration files status
+      debug:
+        msg: "{{ item.item }} - {{ 'EXISTS' if item.stat.exists else 'MISSING' }}"
+      loop: "{{ file_check.results }}"
+
+    - name: Set file permissions for configuration files
+      file:
+        path: "{{ user_home }}/cardano-my-node/{{ item }}"
+        mode: '0644'
+        owner: "{{ ansible_user_id }}"
+        group: "{{ ansible_user_gid }}"
+      loop:
+        - config.json
+        - byron-genesis.json
+        - shelley-genesis.json
+        - alonzo-genesis.json
+        - conway-genesis.json
+        - topology.json
+        - checkpoints.json

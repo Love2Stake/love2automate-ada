@@ -6,4 +6,6 @@
 - import_playbook: install-steps/06-blst_Install.yml
 - import_playbook: install-steps/07-Update_Env_File.yml
 - import_playbook: install-steps/08-Cardano_Node_Build.yml
-- import_playbook: install-steps/09-Create-Startup-Files.yml
+- import_playbook: install-steps/09-Cardano_Config_Files_install.yml
+- import_playbook: install-steps/10-gLiveView.sh_Install.yml
+- import_playbook: install-steps/11-Create-Startup-Files.yml
