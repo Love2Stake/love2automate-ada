@@ -1,24 +1,24 @@
 - name: 04-libsodium_Install_and_Cleanup
   hosts: localhost
   vars_files:
-    - update_param.yml
+    - ../install_param.yml
 
   tasks:
     - name: Ensure git directory exists
       file:
-        path: "{{ user_home }}/git"
+        path: "{{ git_dir }}"
         state: directory
         mode: '0755'
 
     - name: Remove existing libsodium git directory
       file:
-        path: "{{ user_home }}/git/libsodium"
+        path: "{{ git_dir }}/libsodium"
         state: absent
 
     - name: Clone libsodium repository
       git:
         repo: https://github.com/input-output-hk/libsodium
-        dest: "{{ user_home }}/git/libsodium"
+        dest: "{{ git_dir }}/libsodium"
         version: "{{ libsodium_version }}"
         force: yes
 
@@ -50,7 +50,7 @@
           autoreconf -fiv
         }
       args:
-        chdir: "{{ user_home }}/git/libsodium"
+        chdir: "{{ git_dir }}/libsodium"
       register: autogen_result
 
     - name: Configure libsodium
@@ -61,22 +61,22 @@
         fi
         ./configure --prefix=/usr/local >> {{ log_file }} 2>&1
       args:
-        chdir: "{{ user_home }}/git/libsodium"
+        chdir: "{{ git_dir }}/libsodium"
 
     - name: Build libsodium
       shell: make >> {{ log_file }} 2>&1
       args:
-        chdir: "{{ user_home }}/git/libsodium"
+        chdir: "{{ git_dir }}/libsodium"
 
     - name: Run tests (make check)
       shell: make check >> {{ log_file }} 2>&1
       args:
-        chdir: "{{ user_home }}/git/libsodium"
+        chdir: "{{ git_dir }}/libsodium"
 
     - name: Install libsodium
       shell: make install >> {{ log_file }} 2>&1
       args:
-        chdir: "{{ user_home }}/git/libsodium"
+        chdir: "{{ git_dir }}/libsodium"
       become: yes
 
     - name: Update shared library cache

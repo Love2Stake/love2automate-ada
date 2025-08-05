@@ -6,30 +6,30 @@
   tasks:
     - name: Ensure git directory exists
       file:
-        path: "{{ user_home }}/git"
+        path: "{{ git_dir }}"
         state: directory
         mode: '0755'
     
     - name: Remove existing secp256k1 directory if present
       file:
-        path: "{{ user_home }}/git/secp256k1"
+        path: "{{ git_dir }}/secp256k1"
         state: absent
 
     - name: Clone blst
       git:
         repo: https://github.com/supranational/blst
-        dest: "{{ user_home }}/git/blst"
+        dest: "{{ git_dir }}/blst"
         version: "{{ blst_version }}"
 
     - name: Build blst
       shell: ./build.sh >> {{ log_file }} 2>&1
       args:
-        chdir: "{{ user_home }}/git/blst"
+        chdir: "{{ git_dir }}/blst"
         executable: /bin/bash
 
     - name: Create libblst.pc
       copy:
-        dest: "{{ user_home }}/git/blst/libblst.pc"
+        dest: "{{ git_dir }}/blst/libblst.pc"
         content: |
           prefix=/usr/local
           exec_prefix=${prefix}
@@ -50,6 +50,6 @@
         cp libblst.a /usr/local/lib
         chmod u=rw,go=r /usr/local/{lib/{libblst.a,pkgconfig/libblst.pc},include/{blst.{h,hpp},blst_aux.h}}
       args:
-        chdir: "{{ user_home }}/git/blst"
+        chdir: "{{ git_dir }}/blst"
         executable: /bin/bash
       become: yes
