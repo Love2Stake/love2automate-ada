@@ -7,7 +7,7 @@ username: "{{ ansible_user | default(ansible_env.USER) }}"
 # Setting home directory for the user
 user_home: "/home/{{ username }}"
 # Git directory with timestamp to avoid duplication
-git_dir: "{{ user_home }}/git-{{ ansible_date_time.epoch }}"
+git_dir: "{{ user_home }}/git-{{ ansible_date_time.date }}-{{ ansible_date_time.time | replace(':', '') }}"
 # Log file for shell command output
 log_file: "{{ user_home }}/ansible-install.log"
 # Setting timezone
