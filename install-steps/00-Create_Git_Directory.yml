@@ -1,0 +1,26 @@
+- name: Create Git Working Directory
+  hosts: localhost
+  vars_files:
+    - ../install_param.yml
+
+  tasks:
+    - name: Generate unique git directory name
+      set_fact:
+        unique_git_dir: "{{ user_home }}/git-{{ ansible_date_time.date }}-{{ ansible_date_time.time | replace(':', '') }}"
+
+    - name: Create unique git working directory
+      file:
+        path: "{{ unique_git_dir }}"
+        state: directory
+        mode: '0755'
+
+    - name: Store git directory path for other playbooks
+      lineinfile:
+        path: "{{ user_home }}/.git_build_dir"
+        line: "{{ unique_git_dir }}"
+        create: yes
+        mode: '0644'
+
+    - name: Display git directory being used
+      debug:
+        msg: "Using git directory: {{ unique_git_dir }}"

@@ -1,3 +1,4 @@
+- import_playbook: install-steps/00-Create_Git_Directory.yml
 - import_playbook: install-steps/01-Chrony_Setup.yml
 - import_playbook: install-steps/02-OS_Packages_Install.yml
 - import_playbook: install-steps/03-GHCup_Install.yml
