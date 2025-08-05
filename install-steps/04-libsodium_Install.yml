@@ -8,6 +8,26 @@
       debug:
         msg: "Using git_dir: {{ git_dir }}"
 
+    - name: Check if .git_build_dir file exists
+      stat:
+        path: "{{ user_home }}/.git_build_dir"
+      register: git_build_file
+
+    - name: Display .git_build_dir file status
+      debug:
+        msg: "File exists: {{ git_build_file.stat.exists }}, Path: {{ user_home }}/.git_build_dir"
+
+    - name: Show raw file content if exists
+      command: cat "{{ user_home }}/.git_build_dir"
+      register: raw_content
+      when: git_build_file.stat.exists
+      ignore_errors: yes
+
+    - name: Display raw file content
+      debug:
+        msg: "Raw content: '{{ raw_content.stdout }}'"
+      when: git_build_file.stat.exists
+
     - name: Ensure git directory exists
       file:
         path: "{{ git_dir }}"
