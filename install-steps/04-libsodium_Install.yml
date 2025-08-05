@@ -4,6 +4,10 @@
     - ../install_param.yml
 
   tasks:
+    - name: Debug git_dir variable
+      debug:
+        msg: "Using git_dir: {{ git_dir }}"
+
     - name: Ensure git directory exists
       file:
         path: "{{ git_dir }}"
@@ -53,15 +57,34 @@
         chdir: "{{ git_dir }}/libsodium"
       register: autogen_result
 
+    - name: Check if libsodium directory exists and list contents
+      shell: |
+        echo "Checking libsodium directory: {{ git_dir }}/libsodium"
+        ls -la "{{ git_dir }}/libsodium" || echo "Directory does not exist"
+        echo "Current working directory:"
+        pwd
+      register: dir_check
+
+    - name: Display directory check results
+      debug:
+        var: dir_check.stdout_lines
+
     - name: Configure libsodium
       shell: |
         if [ ! -f configure ]; then
           echo "Configure script not found, running autoreconf..."
           autoreconf -fiv
         fi
-        ./configure --prefix=/usr/local >> {{ log_file }} 2>&1
+        echo "Running configure..."
+        ./configure --prefix=/usr/local
       args:
         chdir: "{{ git_dir }}/libsodium"
+      register: configure_result
+
+    - name: Display configure output on failure
+      debug:
+        var: configure_result
+      when: configure_result.rc != 0
 
     - name: Build libsodium
       shell: make >> {{ log_file }} 2>&1
