@@ -118,11 +118,17 @@
 
     - name: Install libsodium
       become: yes
-      shell: > 
-        bash -c "make install >> {{ log_file }} 2>&1"
+      shell: make install
       args:
         chdir: "{{ git_dir }}/libsodium"
-      become: yes
+      register: install_result
+
+    - name: Log install output
+      copy:
+        content: "{{ install_result.stdout }}\n{{ install_result.stderr }}\n"
+        dest: "{{ log_file }}"
+        mode: '0644'
+      delegate_to: localhost
 
     - name: Update shared library cache
       command: ldconfig
