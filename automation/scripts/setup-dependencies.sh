@@ -73,7 +73,7 @@ main() {
 
     # Install required packages including pipx for modern Python package management
     print_info "Installing required packages..."
-    if sudo apt install -y python3-pip python3-venv pipx >/dev/null 2>&1; then
+    if sudo apt install -y python3-pip python3-venv pipx jq curl net-tools >/dev/null 2>&1; then
         print_success "Required packages installed"
     else
         print_error "Failed to install required packages"
