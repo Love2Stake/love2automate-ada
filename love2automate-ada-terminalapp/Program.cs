@@ -52,7 +52,7 @@ public class Program
         rootCommand.AddOption(completeRemovalOption);
 
         // Port option
-        var portOption = new Option<int?>(new[] { "--port", "-p" }, "Port number for Cardano node (updates install_param.yml)");
+        var portOption = new Option<int?>(new[] { "--port", "-p" }, "Port number for Cardano node (updates parameters/install_param.yml)");
         rootCommand.AddOption(portOption);
 
         // Version option
@@ -159,8 +159,8 @@ public class Program
         
         if (target.ToLower() == "cardano-node")
         {
-            var paramFile = await PrepareParameterFile("install_param.yml", port, version);
-            var result = await ExecuteAnsiblePlaybook("Build.yml", paramFile);
+            var paramFile = await PrepareParameterFile("automation/ansible/parameters/install_param.yml", port, version);
+            var result = await ExecuteAnsiblePlaybook("automation/ansible/orchestrators/Build.yml", paramFile);
             
             // Store configuration after successful installation
             if (result == 0)
@@ -194,7 +194,7 @@ public class Program
         
         if (target.ToLower() == "cardano-node")
         {
-            return await ExecuteAnsiblePlaybook("Uninstall.yml", "uninstall-steps/uninstall_param.yml");
+            return await ExecuteAnsiblePlaybook("automation/ansible/orchestrators/Uninstall.yml", "automation/ansible/parameters/uninstall_param.yml");
         }
         
         Console.WriteLine($"Unknown target: {target}");
@@ -340,150 +340,34 @@ public class Program
 
     private static async Task<int> HandleSetupDependencies()
     {
-        Console.WriteLine("Setting up dependencies for love2automate-ada...");
-        Console.WriteLine("This will install Ansible and required collections.");
-        
         try
         {
-            // Update package index
-            Console.WriteLine("Updating package index...");
-            var updateResult = await ExecuteCommand("sudo", "apt update");
-            if (updateResult.ExitCode != 0)
-            {
-                Console.WriteLine("✗ Failed to update package index");
-                return 1;
-            }
-            Console.WriteLine("✓ Package index updated");
-
-            // Install required packages including pipx for modern Python package management
-            Console.WriteLine("Installing required packages...");
-            var packagesResult = await ExecuteCommand("sudo", "apt install -y python3-pip python3-venv pipx");
-            if (packagesResult.ExitCode != 0)
-            {
-                Console.WriteLine("✗ Failed to install required packages");
-                return 1;
-            }
-            Console.WriteLine("✓ Required packages installed");
-
-            // Install ansible-core using pipx (includes ansible-playbook and ansible-galaxy)
-            Console.WriteLine("Installing Ansible Core using pipx...");
-            var ansibleCoreResult = await ExecuteCommand("pipx", "install ansible-core");
-            if (ansibleCoreResult.ExitCode != 0)
-            {
-                Console.WriteLine("Pipx installation failed, trying with pip3 --user --break-system-packages...");
-                var fallbackResult = await ExecuteCommand("pip3", "install --user --break-system-packages ansible-core");
-                if (fallbackResult.ExitCode != 0)
-                {
-                    Console.WriteLine("✗ Failed to install ansible-core with both methods");
-                    return 1;
-                }
-            }
-            Console.WriteLine("✓ Ansible Core installed");
-
-            // Also install the full ansible package for additional modules
-            Console.WriteLine("Installing full Ansible package...");
-            var ansibleFullResult = await ExecuteCommand("pipx", "install ansible");
-            if (ansibleFullResult.ExitCode != 0)
-            {
-                Console.WriteLine("Full ansible package installation failed, continuing with core only...");
-            }
-            else
-            {
-                Console.WriteLine("✓ Full Ansible package installed");
-            }
-
-            // Ensure pipx bin directory is in PATH
-            Console.WriteLine("Ensuring pipx is properly configured...");
-            await ExecuteCommand("pipx", "ensurepath");
-
-            // Add to PATH in .bashrc if not already present
-            Console.WriteLine("Updating PATH in .bashrc...");
-            var homeDir = Environment.GetEnvironmentVariable("HOME");
-            var bashrcPath = Path.Combine(homeDir ?? "/root", ".bashrc");
-            var pathExportPip = "export PATH=\"$HOME/.local/bin:$PATH\"";
+            // Execute the setup-dependencies.sh script
+            var scriptPath = Path.Combine(GetProjectRoot(), "automation/scripts/setup-dependencies.sh");
             
-            if (File.Exists(bashrcPath))
+            // If running from development environment, use relative path
+            if (!File.Exists(scriptPath))
             {
-                var bashrcContent = await File.ReadAllTextAsync(bashrcPath);
-                var needsUpdate = false;
-                var pathsToAdd = new List<string>();
-                
-                if (!bashrcContent.Contains("$HOME/.local/bin"))
-                {
-                    pathsToAdd.Add(pathExportPip);
-                    needsUpdate = true;
-                }
-                
-                if (needsUpdate)
-                {
-                    var pathSection = "\n# Added by love2automate-ada setup\n" + string.Join("\n", pathsToAdd) + "\n";
-                    await File.AppendAllTextAsync(bashrcPath, pathSection);
-                    Console.WriteLine("✓ PATH updated in .bashrc");
-                }
-                else
-                {
-                    Console.WriteLine("✓ PATH already configured in .bashrc");
-                }
-            }
-
-            // Install Ansible collections
-            Console.WriteLine("Installing Ansible collections...");
-            
-            // Try to find ansible-galaxy in common locations
-            var ansibleGalaxyPaths = new[]
-            {
-                "ansible-galaxy", // If in PATH
-                $"{homeDir}/.local/bin/ansible-galaxy", // pipx/pip user install
-                "/usr/bin/ansible-galaxy" // system install
-            };
-            
-            string? workingAnsibleGalaxy = null;
-            foreach (var path in ansibleGalaxyPaths)
-            {
-                var testResult = await ExecuteCommand("which", path, suppressOutput: true);
-                if (testResult.ExitCode == 0 || File.Exists(path))
-                {
-                    workingAnsibleGalaxy = path;
-                    break;
-                }
+                var currentDir = Directory.GetCurrentDirectory();
+                scriptPath = Path.Combine(currentDir, "automation/scripts/setup-dependencies.sh");
             }
             
-            if (workingAnsibleGalaxy == null)
+            if (!File.Exists(scriptPath))
             {
-                Console.WriteLine("✗ Could not find ansible-galaxy command");
+                Console.WriteLine("✗ setup-dependencies.sh script not found");
+                Console.WriteLine("Expected locations:");
+                Console.WriteLine($"  - {Path.Combine(GetProjectRoot(), "automation/scripts/setup-dependencies.sh")}");
+                Console.WriteLine($"  - {Path.Combine(Directory.GetCurrentDirectory(), "automation/scripts/setup-dependencies.sh")}");
                 return 1;
             }
+
+            // Make sure the script is executable
+            await ExecuteCommand("chmod", $"+x {scriptPath}", suppressOutput: true);
+
+            // Execute the script interactively to preserve colored output and user prompts
+            var result = await ExecuteCommandInteractive("bash", scriptPath);
             
-            // Install community.general collection
-            var communityResult = await ExecuteCommand(workingAnsibleGalaxy, "collection install community.general");
-            if (communityResult.ExitCode != 0)
-            {
-                Console.WriteLine("✗ Failed to install community.general collection");
-                return 1;
-            }
-            Console.WriteLine("✓ community.general collection installed");
-
-            // Install ansible.posix collection
-            var posixResult = await ExecuteCommand(workingAnsibleGalaxy, "collection install ansible.posix");
-            if (posixResult.ExitCode != 0)
-            {
-                Console.WriteLine("✗ Failed to install ansible.posix collection");
-                return 1;
-            }
-            Console.WriteLine("✓ ansible.posix collection installed");
-
-            Console.WriteLine();
-            Console.WriteLine("✓ Dependencies setup completed successfully!");
-            Console.WriteLine();
-            Console.WriteLine("⚠️  IMPORTANT: You MUST restart your terminal or run 'source ~/.bashrc' for PATH changes to take effect.");
-            Console.WriteLine();
-            Console.WriteLine("Next steps:");
-            Console.WriteLine("1. Restart your terminal (or run: source ~/.bashrc)");
-            Console.WriteLine("2. Run: love2automate-ada --setup");
-            Console.WriteLine("3. Configure your inventory.ini file");
-            Console.WriteLine("4. Run: love2automate-ada --install cardano-node");
-
-            return 0;
+            return result.ExitCode;
         }
         catch (Exception ex)
         {
@@ -523,7 +407,7 @@ public class Program
 
             // Run the Uninstall.yml playbook to properly remove Cardano node
             Console.WriteLine("Running Uninstall.yml playbook...");
-            var uninstallResult = await ExecuteAnsiblePlaybook("Uninstall.yml", "uninstall-steps/uninstall_param.yml");
+            var uninstallResult = await ExecuteAnsiblePlaybook("automation/ansible/orchestrators/Uninstall.yml", "automation/ansible/parameters/uninstall_param.yml");
             if (uninstallResult != 0)
             {
                 Console.WriteLine("⚠️  Uninstall playbook failed, but continuing with cleanup...");
@@ -663,8 +547,8 @@ public class Program
         // Check 3: Ansible files setup
         Console.Write("Checking Ansible files... ");
         var appDir = "/opt/love2automate-ada";
-        var buildYmlPath = Path.Combine(appDir, "Build.yml");
-        var inventoryPath = Path.Combine(appDir, "inventory.ini");
+        var buildYmlPath = Path.Combine(appDir, "automation/ansible/orchestrators/Build.yml");
+        var inventoryPath = Path.Combine(appDir, "automation/ansible/inventory.ini");
         
         if (!Directory.Exists(appDir) || !File.Exists(buildYmlPath))
         {
@@ -682,7 +566,7 @@ public class Program
         {
             Console.WriteLine("✗ NOT FOUND");
             Console.WriteLine();
-            Console.WriteLine("Inventory file is missing. Please create inventory.ini in /opt/love2automate-ada/");
+            Console.WriteLine("Inventory file is missing. Please create inventory.ini in /opt/love2automate-ada/automation/ansible/");
             Console.WriteLine("Example content:");
             Console.WriteLine("[cardano_nodes]");
             Console.WriteLine("localhost ansible_connection=local");
@@ -696,7 +580,7 @@ public class Program
             Console.WriteLine("✗ EMPTY");
             Console.WriteLine();
             Console.WriteLine("Inventory file exists but appears to be empty or only contains comments.");
-            Console.WriteLine("Please configure inventory.ini in /opt/love2automate-ada/");
+            Console.WriteLine("Please configure inventory.ini in /opt/love2automate-ada/automation/ansible/");
             Console.WriteLine("Example content:");
             Console.WriteLine("[cardano_nodes]");
             Console.WriteLine("localhost ansible_connection=local");
@@ -746,9 +630,10 @@ public class Program
     private static async Task<int> ExecuteAnsiblePlaybook(string playbookFile, string paramFile)
     {
         var projectRoot = GetProjectRoot();
+        var ansibleRoot = Path.Combine(projectRoot, "automation/ansible");
         var playbookPath = Path.Combine(projectRoot, playbookFile);
         var paramPath = Path.Combine(projectRoot, paramFile);
-        var inventoryPath = Path.Combine(projectRoot, "inventory.ini");
+        var inventoryPath = Path.Combine(projectRoot, "automation/ansible/inventory.ini");
 
         if (!File.Exists(playbookPath))
         {
@@ -768,12 +653,18 @@ public class Program
             return 1;
         }
 
+        // Convert to relative paths from the ansible directory
+        var relativePlaybookPath = Path.GetRelativePath(ansibleRoot, playbookPath);
+        var relativeParamPath = Path.GetRelativePath(ansibleRoot, paramPath);
+        var relativeInventoryPath = Path.GetRelativePath(ansibleRoot, inventoryPath);
+
         // Always use --ask-become-pass for safety since playbooks require sudo
-        string arguments = $"-i {inventoryPath} -e @{paramPath} --ask-become-pass {playbookPath}";
+        string arguments = $"-i {relativeInventoryPath} -e @{relativeParamPath} --ask-become-pass {relativePlaybookPath}";
         Console.WriteLine("Note: This playbook requires sudo privileges. You will be prompted for your password.");
         Console.WriteLine($"Executing: ansible-playbook {arguments}");
+        Console.WriteLine($"Working directory: {ansibleRoot}");
 
-        var result = await ExecuteCommandInteractive("ansible-playbook", arguments);
+        var result = await ExecuteCommandInteractive("ansible-playbook", arguments, ansibleRoot);
         
         if (result.ExitCode == 0)
         {
@@ -847,7 +738,7 @@ public class Program
         }
     }
 
-    private static async Task<(int ExitCode, string Output, string Error)> ExecuteCommandInteractive(string command, string arguments)
+    private static async Task<(int ExitCode, string Output, string Error)> ExecuteCommandInteractive(string command, string arguments, string? workingDirectory = null)
     {
         var processStartInfo = new ProcessStartInfo
         {
@@ -859,6 +750,11 @@ public class Program
             RedirectStandardError = false,
             RedirectStandardInput = false
         };
+
+        if (!string.IsNullOrEmpty(workingDirectory))
+        {
+            processStartInfo.WorkingDirectory = workingDirectory;
+        }
 
         using var process = new Process { StartInfo = processStartInfo };
         
@@ -882,7 +778,7 @@ public class Program
         var appDir = "/opt/love2automate-ada";
         
         // Check if setup has been run
-        if (!Directory.Exists(appDir) || !File.Exists(Path.Combine(appDir, "Build.yml")))
+        if (!Directory.Exists(appDir) || !File.Exists(Path.Combine(appDir, "automation/ansible/orchestrators/Build.yml")))
         {
             Console.WriteLine("✗ Ansible files not found. Please run setup first:");
             Console.WriteLine("  sudo love2automate-ada --setup");
@@ -906,7 +802,7 @@ public class Program
             }
             else
             {
-                // Use the script's default version (10.5.1) - no need to read from install_param.yml
+                // Use the script's default version (10.5.1) - no need to read from parameters/install_param.yml
                 cardanoNodeVersion = "10.5.1";
                 Console.WriteLine($"Using default Cardano Node version: {cardanoNodeVersion}");
             }
@@ -914,7 +810,7 @@ public class Program
             Console.WriteLine($"Fetching dependency versions for Cardano Node version {cardanoNodeVersion}...");
 
             // Execute the get-dependency-versions.sh script
-            var scriptPath = Path.Combine(projectRoot, "get-dependency-versions.sh");
+            var scriptPath = Path.Combine(projectRoot, "automation/scripts/get-dependency-versions.sh");
             
             if (!File.Exists(scriptPath))
             {
@@ -1164,7 +1060,7 @@ public class Program
         try
         {
             var projectRoot = GetProjectRoot();
-            var paramPath = Path.Combine(projectRoot, "install_param.yml");
+            var paramPath = Path.Combine(projectRoot, "automation/ansible/parameters/install_param.yml");
 
             if (!File.Exists(paramPath))
             {
