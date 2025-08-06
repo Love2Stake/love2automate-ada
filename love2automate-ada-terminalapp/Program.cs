@@ -340,150 +340,34 @@ public class Program
 
     private static async Task<int> HandleSetupDependencies()
     {
-        Console.WriteLine("Setting up dependencies for love2automate-ada...");
-        Console.WriteLine("This will install Ansible and required collections.");
-        
         try
         {
-            // Update package index
-            Console.WriteLine("Updating package index...");
-            var updateResult = await ExecuteCommand("sudo", "apt update");
-            if (updateResult.ExitCode != 0)
-            {
-                Console.WriteLine("✗ Failed to update package index");
-                return 1;
-            }
-            Console.WriteLine("✓ Package index updated");
-
-            // Install required packages including pipx for modern Python package management
-            Console.WriteLine("Installing required packages...");
-            var packagesResult = await ExecuteCommand("sudo", "apt install -y python3-pip python3-venv pipx");
-            if (packagesResult.ExitCode != 0)
-            {
-                Console.WriteLine("✗ Failed to install required packages");
-                return 1;
-            }
-            Console.WriteLine("✓ Required packages installed");
-
-            // Install ansible-core using pipx (includes ansible-playbook and ansible-galaxy)
-            Console.WriteLine("Installing Ansible Core using pipx...");
-            var ansibleCoreResult = await ExecuteCommand("pipx", "install ansible-core");
-            if (ansibleCoreResult.ExitCode != 0)
-            {
-                Console.WriteLine("Pipx installation failed, trying with pip3 --user --break-system-packages...");
-                var fallbackResult = await ExecuteCommand("pip3", "install --user --break-system-packages ansible-core");
-                if (fallbackResult.ExitCode != 0)
-                {
-                    Console.WriteLine("✗ Failed to install ansible-core with both methods");
-                    return 1;
-                }
-            }
-            Console.WriteLine("✓ Ansible Core installed");
-
-            // Also install the full ansible package for additional modules
-            Console.WriteLine("Installing full Ansible package...");
-            var ansibleFullResult = await ExecuteCommand("pipx", "install ansible");
-            if (ansibleFullResult.ExitCode != 0)
-            {
-                Console.WriteLine("Full ansible package installation failed, continuing with core only...");
-            }
-            else
-            {
-                Console.WriteLine("✓ Full Ansible package installed");
-            }
-
-            // Ensure pipx bin directory is in PATH
-            Console.WriteLine("Ensuring pipx is properly configured...");
-            await ExecuteCommand("pipx", "ensurepath");
-
-            // Add to PATH in .bashrc if not already present
-            Console.WriteLine("Updating PATH in .bashrc...");
-            var homeDir = Environment.GetEnvironmentVariable("HOME");
-            var bashrcPath = Path.Combine(homeDir ?? "/root", ".bashrc");
-            var pathExportPip = "export PATH=\"$HOME/.local/bin:$PATH\"";
+            // Execute the setup-dependencies.sh script
+            var scriptPath = Path.Combine(GetProjectRoot(), "automation/scripts/setup-dependencies.sh");
             
-            if (File.Exists(bashrcPath))
+            // If running from development environment, use relative path
+            if (!File.Exists(scriptPath))
             {
-                var bashrcContent = await File.ReadAllTextAsync(bashrcPath);
-                var needsUpdate = false;
-                var pathsToAdd = new List<string>();
-                
-                if (!bashrcContent.Contains("$HOME/.local/bin"))
-                {
-                    pathsToAdd.Add(pathExportPip);
-                    needsUpdate = true;
-                }
-                
-                if (needsUpdate)
-                {
-                    var pathSection = "\n# Added by love2automate-ada setup\n" + string.Join("\n", pathsToAdd) + "\n";
-                    await File.AppendAllTextAsync(bashrcPath, pathSection);
-                    Console.WriteLine("✓ PATH updated in .bashrc");
-                }
-                else
-                {
-                    Console.WriteLine("✓ PATH already configured in .bashrc");
-                }
-            }
-
-            // Install Ansible collections
-            Console.WriteLine("Installing Ansible collections...");
-            
-            // Try to find ansible-galaxy in common locations
-            var ansibleGalaxyPaths = new[]
-            {
-                "ansible-galaxy", // If in PATH
-                $"{homeDir}/.local/bin/ansible-galaxy", // pipx/pip user install
-                "/usr/bin/ansible-galaxy" // system install
-            };
-            
-            string? workingAnsibleGalaxy = null;
-            foreach (var path in ansibleGalaxyPaths)
-            {
-                var testResult = await ExecuteCommand("which", path, suppressOutput: true);
-                if (testResult.ExitCode == 0 || File.Exists(path))
-                {
-                    workingAnsibleGalaxy = path;
-                    break;
-                }
+                var currentDir = Directory.GetCurrentDirectory();
+                scriptPath = Path.Combine(currentDir, "automation/scripts/setup-dependencies.sh");
             }
             
-            if (workingAnsibleGalaxy == null)
+            if (!File.Exists(scriptPath))
             {
-                Console.WriteLine("✗ Could not find ansible-galaxy command");
+                Console.WriteLine("✗ setup-dependencies.sh script not found");
+                Console.WriteLine("Expected locations:");
+                Console.WriteLine($"  - {Path.Combine(GetProjectRoot(), "automation/scripts/setup-dependencies.sh")}");
+                Console.WriteLine($"  - {Path.Combine(Directory.GetCurrentDirectory(), "automation/scripts/setup-dependencies.sh")}");
                 return 1;
             }
+
+            // Make sure the script is executable
+            await ExecuteCommand("chmod", $"+x {scriptPath}", suppressOutput: true);
+
+            // Execute the script interactively to preserve colored output and user prompts
+            var result = await ExecuteCommandInteractive("bash", scriptPath);
             
-            // Install community.general collection
-            var communityResult = await ExecuteCommand(workingAnsibleGalaxy, "collection install community.general");
-            if (communityResult.ExitCode != 0)
-            {
-                Console.WriteLine("✗ Failed to install community.general collection");
-                return 1;
-            }
-            Console.WriteLine("✓ community.general collection installed");
-
-            // Install ansible.posix collection
-            var posixResult = await ExecuteCommand(workingAnsibleGalaxy, "collection install ansible.posix");
-            if (posixResult.ExitCode != 0)
-            {
-                Console.WriteLine("✗ Failed to install ansible.posix collection");
-                return 1;
-            }
-            Console.WriteLine("✓ ansible.posix collection installed");
-
-            Console.WriteLine();
-            Console.WriteLine("✓ Dependencies setup completed successfully!");
-            Console.WriteLine();
-            Console.WriteLine("⚠️  IMPORTANT: You MUST restart your terminal or run 'source ~/.bashrc' for PATH changes to take effect.");
-            Console.WriteLine();
-            Console.WriteLine("Next steps:");
-            Console.WriteLine("1. Restart your terminal (or run: source ~/.bashrc)");
-            Console.WriteLine("2. Run: love2automate-ada --setup");
-            Console.WriteLine("3. Configure your inventory.ini file");
-            Console.WriteLine("4. Run: love2automate-ada --install cardano-node");
-
-            return 0;
+            return result.ExitCode;
         }
         catch (Exception ex)
         {
