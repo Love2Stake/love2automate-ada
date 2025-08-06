@@ -8,8 +8,8 @@ username: "{{ ansible_user | default(ansible_env.USER) }}"
 user_home: "/home/{{ username }}"
 # Git directory (use cached fact from step 00, fallback to file lookup, then temp)
 git_dir: "{{ hostvars[inventory_hostname]['git_dir'] | default(lookup('file', '/tmp' + '/.git_build_dir', errors='ignore') | trim) | default('/tmp' + '/git-temp') }}"
-# Log file for shell command output
-log_file: "/tmp/ansible-install.log"
+# Log file (use cached fact from step 00, fallback to file lookup, then temp)
+log_file: "{{ hostvars[inventory_hostname]['log_file'] | default(lookup('file', '/tmp' + '/.log_file_path', errors='ignore') | trim) | default('/tmp' + '/ansible-install-temp.log') }}"
 # Setting timezone
 timezone_setting: Europe/London
 
