@@ -6,19 +6,19 @@
   tasks:
     - name: Ensure git directory exists
       file:
-        path: "{{ user_home }}/git"
+        path: "{{ git_dir }}"
         state: directory
         mode: '0755'
 
     - name: Remove existing secp256k1 directory if present
       file:
-        path: "{{ user_home }}/git/secp256k1"
+        path: "{{ git_dir }}/secp256k1"
         state: absent
 
     - name: Clone secp256k1
       git:
         repo: https://github.com/bitcoin-core/secp256k1
-        dest: "{{ user_home }}/git/secp256k1"
+        dest: "{{ git_dir }}/secp256k1"
         version: "{{ secp256k1_version }}"
         depth: 1
 
@@ -29,15 +29,21 @@
         make
         make check
       args:
-        chdir: "{{ user_home }}/git/secp256k1"
+        chdir: "{{ git_dir }}/secp256k1"
         executable: /bin/bash
 
     - name: Install secp256k1
-      shell: make install >> {{ log_file }} 2>&1
+      shell: make install
       args:
-        chdir: "{{ user_home }}/git/secp256k1"
-        executable: /bin/bash
+        chdir: "{{ git_dir }}/secp256k1"
       become: yes
+
+    - name: Log install output
+      copy:
+        content: "{{ install_result.stdout }}\n{{ install_result.stderr }}\n"
+        dest: "{{ log_file }}"
+        mode: '0644'
+      delegate_to: localhost
 
     - name: Run ldconfig for secp256k1
       shell: ldconfig
