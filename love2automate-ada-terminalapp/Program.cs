@@ -52,7 +52,7 @@ public class Program
         rootCommand.AddOption(completeRemovalOption);
 
         // Port option
-        var portOption = new Option<int?>(new[] { "--port", "-p" }, "Port number for Cardano node (updates install_param.yml)");
+        var portOption = new Option<int?>(new[] { "--port", "-p" }, "Port number for Cardano node (updates parameters/install_param.yml)");
         rootCommand.AddOption(portOption);
 
         // Version option
@@ -159,8 +159,8 @@ public class Program
         
         if (target.ToLower() == "cardano-node")
         {
-            var paramFile = await PrepareParameterFile("install_param.yml", port, version);
-            var result = await ExecuteAnsiblePlaybook("Build.yml", paramFile);
+            var paramFile = await PrepareParameterFile("automation/ansible/parameters/install_param.yml", port, version);
+            var result = await ExecuteAnsiblePlaybook("automation/ansible/orchestrators/Build.yml", paramFile);
             
             // Store configuration after successful installation
             if (result == 0)
@@ -194,7 +194,7 @@ public class Program
         
         if (target.ToLower() == "cardano-node")
         {
-            return await ExecuteAnsiblePlaybook("Uninstall.yml", "uninstall-steps/uninstall_param.yml");
+            return await ExecuteAnsiblePlaybook("automation/ansible/orchestrators/Uninstall.yml", "automation/ansible/parameters/uninstall_param.yml");
         }
         
         Console.WriteLine($"Unknown target: {target}");
@@ -523,7 +523,7 @@ public class Program
 
             // Run the Uninstall.yml playbook to properly remove Cardano node
             Console.WriteLine("Running Uninstall.yml playbook...");
-            var uninstallResult = await ExecuteAnsiblePlaybook("Uninstall.yml", "uninstall-steps/uninstall_param.yml");
+            var uninstallResult = await ExecuteAnsiblePlaybook("automation/ansible/orchestrators/Uninstall.yml", "automation/ansible/parameters/uninstall_param.yml");
             if (uninstallResult != 0)
             {
                 Console.WriteLine("⚠️  Uninstall playbook failed, but continuing with cleanup...");
@@ -663,8 +663,8 @@ public class Program
         // Check 3: Ansible files setup
         Console.Write("Checking Ansible files... ");
         var appDir = "/opt/love2automate-ada";
-        var buildYmlPath = Path.Combine(appDir, "Build.yml");
-        var inventoryPath = Path.Combine(appDir, "inventory.ini");
+        var buildYmlPath = Path.Combine(appDir, "automation/ansible/orchestrators/Build.yml");
+        var inventoryPath = Path.Combine(appDir, "automation/ansible/inventory.ini");
         
         if (!Directory.Exists(appDir) || !File.Exists(buildYmlPath))
         {
@@ -682,7 +682,7 @@ public class Program
         {
             Console.WriteLine("✗ NOT FOUND");
             Console.WriteLine();
-            Console.WriteLine("Inventory file is missing. Please create inventory.ini in /opt/love2automate-ada/");
+            Console.WriteLine("Inventory file is missing. Please create inventory.ini in /opt/love2automate-ada/automation/ansible/");
             Console.WriteLine("Example content:");
             Console.WriteLine("[cardano_nodes]");
             Console.WriteLine("localhost ansible_connection=local");
@@ -696,7 +696,7 @@ public class Program
             Console.WriteLine("✗ EMPTY");
             Console.WriteLine();
             Console.WriteLine("Inventory file exists but appears to be empty or only contains comments.");
-            Console.WriteLine("Please configure inventory.ini in /opt/love2automate-ada/");
+            Console.WriteLine("Please configure inventory.ini in /opt/love2automate-ada/automation/ansible/");
             Console.WriteLine("Example content:");
             Console.WriteLine("[cardano_nodes]");
             Console.WriteLine("localhost ansible_connection=local");
@@ -746,9 +746,10 @@ public class Program
     private static async Task<int> ExecuteAnsiblePlaybook(string playbookFile, string paramFile)
     {
         var projectRoot = GetProjectRoot();
+        var ansibleRoot = Path.Combine(projectRoot, "automation/ansible");
         var playbookPath = Path.Combine(projectRoot, playbookFile);
         var paramPath = Path.Combine(projectRoot, paramFile);
-        var inventoryPath = Path.Combine(projectRoot, "inventory.ini");
+        var inventoryPath = Path.Combine(projectRoot, "automation/ansible/inventory.ini");
 
         if (!File.Exists(playbookPath))
         {
@@ -768,12 +769,18 @@ public class Program
             return 1;
         }
 
+        // Convert to relative paths from the ansible directory
+        var relativePlaybookPath = Path.GetRelativePath(ansibleRoot, playbookPath);
+        var relativeParamPath = Path.GetRelativePath(ansibleRoot, paramPath);
+        var relativeInventoryPath = Path.GetRelativePath(ansibleRoot, inventoryPath);
+
         // Always use --ask-become-pass for safety since playbooks require sudo
-        string arguments = $"-i {inventoryPath} -e @{paramPath} --ask-become-pass {playbookPath}";
+        string arguments = $"-i {relativeInventoryPath} -e @{relativeParamPath} --ask-become-pass {relativePlaybookPath}";
         Console.WriteLine("Note: This playbook requires sudo privileges. You will be prompted for your password.");
         Console.WriteLine($"Executing: ansible-playbook {arguments}");
+        Console.WriteLine($"Working directory: {ansibleRoot}");
 
-        var result = await ExecuteCommandInteractive("ansible-playbook", arguments);
+        var result = await ExecuteCommandInteractive("ansible-playbook", arguments, ansibleRoot);
         
         if (result.ExitCode == 0)
         {
@@ -847,7 +854,7 @@ public class Program
         }
     }
 
-    private static async Task<(int ExitCode, string Output, string Error)> ExecuteCommandInteractive(string command, string arguments)
+    private static async Task<(int ExitCode, string Output, string Error)> ExecuteCommandInteractive(string command, string arguments, string? workingDirectory = null)
     {
         var processStartInfo = new ProcessStartInfo
         {
@@ -859,6 +866,11 @@ public class Program
             RedirectStandardError = false,
             RedirectStandardInput = false
         };
+
+        if (!string.IsNullOrEmpty(workingDirectory))
+        {
+            processStartInfo.WorkingDirectory = workingDirectory;
+        }
 
         using var process = new Process { StartInfo = processStartInfo };
         
@@ -882,7 +894,7 @@ public class Program
         var appDir = "/opt/love2automate-ada";
         
         // Check if setup has been run
-        if (!Directory.Exists(appDir) || !File.Exists(Path.Combine(appDir, "Build.yml")))
+        if (!Directory.Exists(appDir) || !File.Exists(Path.Combine(appDir, "automation/ansible/orchestrators/Build.yml")))
         {
             Console.WriteLine("✗ Ansible files not found. Please run setup first:");
             Console.WriteLine("  sudo love2automate-ada --setup");
@@ -906,7 +918,7 @@ public class Program
             }
             else
             {
-                // Use the script's default version (10.5.1) - no need to read from install_param.yml
+                // Use the script's default version (10.5.1) - no need to read from parameters/install_param.yml
                 cardanoNodeVersion = "10.5.1";
                 Console.WriteLine($"Using default Cardano Node version: {cardanoNodeVersion}");
             }
@@ -914,7 +926,7 @@ public class Program
             Console.WriteLine($"Fetching dependency versions for Cardano Node version {cardanoNodeVersion}...");
 
             // Execute the get-dependency-versions.sh script
-            var scriptPath = Path.Combine(projectRoot, "get-dependency-versions.sh");
+            var scriptPath = Path.Combine(projectRoot, "automation/scripts/get-dependency-versions.sh");
             
             if (!File.Exists(scriptPath))
             {
@@ -1164,7 +1176,7 @@ public class Program
         try
         {
             var projectRoot = GetProjectRoot();
-            var paramPath = Path.Combine(projectRoot, "install_param.yml");
+            var paramPath = Path.Combine(projectRoot, "automation/ansible/parameters/install_param.yml");
 
             if (!File.Exists(paramPath))
             {
