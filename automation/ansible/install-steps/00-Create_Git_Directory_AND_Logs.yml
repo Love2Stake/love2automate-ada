@@ -1,0 +1,49 @@
+- name: Create Git Working Directory
+  hosts: localhost
+  vars_files:
+    - ../install_param.yml
+
+  tasks:
+    - name: Generate unique git directory name
+      set_fact:
+        unique_git_dir: "/tmp/git-{{ ansible_date_time.date }}-{{ ansible_date_time.time | replace(':', '') }}"
+
+    - name: Generate unique log file name
+      set_fact:
+        unique_log_file: "/tmp/ansible-install-{{ ansible_date_time.date }}-{{ ansible_date_time.time | replace(':', '') }}.log"
+
+    - name: Create unique git working directory
+      file:
+        path: "{{ unique_git_dir }}"
+        state: directory
+        mode: '0755'
+
+    - name: Store git directory path for other playbooks (simple format)
+      copy:
+        content: "{{ unique_git_dir }}"
+        dest: "/tmp/.git_build_dir"
+        mode: '0644'
+
+    - name: Store log file path for other playbooks (simple format)
+      copy:
+        content: "{{ unique_log_file }}"
+        dest: "/tmp/.log_file_path"
+        mode: '0644'
+
+    - name: Set git_dir as a host fact for all subsequent playbooks
+      set_fact:
+        git_dir: "{{ unique_git_dir }}"
+        cacheable: yes
+
+    - name: Set log_file as a host fact for all subsequent playbooks
+      set_fact:
+        log_file: "{{ unique_log_file }}"
+        cacheable: yes
+
+    - name: Display git directory being used
+      debug:
+        msg: "Created and using git directory: {{ unique_git_dir }}"
+
+    - name: Display log file being used
+      debug:
+        msg: "Using log file: {{ unique_log_file }}"

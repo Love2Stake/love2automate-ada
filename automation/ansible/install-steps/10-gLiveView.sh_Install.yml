@@ -1,0 +1,29 @@
+- name: Install gLiveView.sh and env files
+  hosts: localhost
+
+  tasks:
+    - name: Ensure cardano-my-node directory exists
+      file:
+        path: "{{ user_home }}/cardano-my-node"
+        state: directory
+        mode: '0755'
+    - name: Download gLiveView.sh script
+      get_url:
+        url: https://raw.githubusercontent.com/cardano-community/guild-operators/master/scripts/cnode-helper-scripts/gLiveView.sh
+        dest: "{{ user_home }}/cardano-my-node/gLiveView.sh"
+        mode: '0755'
+        force: yes
+
+    - name: Download env file
+      get_url:
+        url: https://raw.githubusercontent.com/cardano-community/guild-operators/master/scripts/cnode-helper-scripts/env
+        dest: "{{ user_home }}/cardano-my-node/env"
+        mode:
+        force: yes
+
+    - name: Configure CNODE_PORT in env file
+      lineinfile:
+        path: "{{ user_home }}/cardano-my-node/env"
+        regexp: '^#CNODE_PORT='
+        line: 'CNODE_PORT={{ cardano_port }}'
+        backup: yes

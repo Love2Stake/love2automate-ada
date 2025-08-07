@@ -1,0 +1,135 @@
+- name: 04-libsodium_Install_and_Cleanup
+  hosts: localhost
+  vars_files:
+    - ../install_param.yml
+
+  tasks:
+    - name: Debug git_dir variable
+      debug:
+        msg: "Using git_dir: {{ git_dir }}"
+
+    - name: Check if .git_build_dir file exists
+      stat:
+        path: "/tmp/.git_build_dir"
+      register: git_build_file
+
+    - name: Display .git_build_dir file status
+      debug:
+        msg: "File exists: {{ git_build_file.stat.exists }}, Path: /tmp/.git_build_dir"
+
+    - name: Show raw file content if exists
+      command: cat "/tmp/.git_build_dir"
+      register: raw_content
+      when: git_build_file.stat.exists
+      ignore_errors: yes
+
+    - name: Display raw file content
+      debug:
+        msg: "Raw content: '{{ raw_content.stdout }}'"
+      when: git_build_file.stat.exists
+
+    - name: Ensure git directory exists
+      file:
+        path: "{{ git_dir }}"
+        state: directory
+        mode: '0755'
+
+    - name: Remove existing libsodium git directory
+      file:
+        path: "{{ git_dir }}/libsodium"
+        state: absent
+
+    - name: Clone libsodium repository
+      git:
+        repo: https://github.com/input-output-hk/libsodium
+        dest: "{{ git_dir }}/libsodium"
+        version: "{{ libsodium_version }}"
+        force: yes
+
+    - name: Install autotools packages
+      package:
+        name:
+          - autotools-dev
+          - autoconf
+          - automake
+          - libtool
+        state: present
+      become: yes
+
+    - name: Run autogen.sh with timeout and fallback
+      shell: |
+        timeout 300 ./autogen.sh >> {{ log_file }} 2>&1 || {
+          echo "autogen.sh timed out or failed, using fallback method..."
+          # Clean any corrupted files
+          git clean -fdx
+          git reset --hard HEAD
+          # Use system config.guess and config.sub if available
+          if [ -f /usr/share/automake-*/config.guess ]; then
+            cp /usr/share/automake-*/config.guess build-aux/
+          fi
+          if [ -f /usr/share/automake-*/config.sub ]; then
+            cp /usr/share/automake-*/config.sub build-aux/
+          fi
+          # Run autoreconf as alternative
+          autoreconf -fiv
+        }
+      args:
+        chdir: "{{ git_dir }}/libsodium"
+      register: autogen_result
+
+    - name: Check if libsodium directory exists and list contents
+      shell: |
+        echo "Checking libsodium directory: {{ git_dir }}/libsodium"
+        ls -la "{{ git_dir }}/libsodium" || echo "Directory does not exist"
+        echo "Current working directory:"
+        pwd
+      register: dir_check
+
+    - name: Display directory check results
+      debug:
+        var: dir_check.stdout_lines
+
+    - name: Configure libsodium
+      shell: |
+        if [ ! -f configure ]; then
+          echo "Configure script not found, running autoreconf..."
+          autoreconf -fiv
+        fi
+        echo "Running configure..."
+        ./configure --prefix=/usr/local
+      args:
+        chdir: "{{ git_dir }}/libsodium"
+      register: configure_result
+
+    - name: Display configure output on failure
+      debug:
+        var: configure_result
+      when: configure_result.rc != 0
+
+    - name: Build libsodium
+      shell: make >> {{ log_file }} 2>&1
+      args:
+        chdir: "{{ git_dir }}/libsodium"
+
+    - name: Run tests (make check)
+      shell: make check >> {{ log_file }} 2>&1
+      args:
+        chdir: "{{ git_dir }}/libsodium"
+
+    - name: Install libsodium
+      become: yes
+      shell: make install
+      args:
+        chdir: "{{ git_dir }}/libsodium"
+      register: install_result
+
+    - name: Log install output
+      copy:
+        content: "{{ install_result.stdout }}\n{{ install_result.stderr }}\n"
+        dest: "{{ log_file }}"
+        mode: '0644'
+      delegate_to: localhost
+
+    - name: Update shared library cache
+      command: ldconfig
+      become: yes

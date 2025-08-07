@@ -6,7 +6,7 @@
   tasks:
     - name: Ensure working directory exists
       file:
-        path: "{{ user_home }}/git"
+        path: "{{ git_dir }}"
         state: directory
         mode: '0755'
 
@@ -41,21 +41,21 @@
       when: install_method == "download"
       get_url:
         url: "https://github.com/IntersectMBO/cardano-node/releases/download/{{ cardano_node_version }}/cardano-node-{{ cardano_node_version }}-linux.tar.gz"
-        dest: "{{ user_home }}/git/cardano-node-{{ cardano_node_version }}-linux.tar.gz"
+        dest: "{{ git_dir }}/cardano-node-{{ cardano_node_version }}-linux.tar.gz"
         mode: '0644'
         force: yes
 
     - name: Ensure cardano-binary directory exists
       file:
-        path: "{{ user_home }}/git/cardano-binary"
+        path: "{{ git_dir }}/cardano-binary"
         state: directory
         mode: '0755'
 
     - name: Extract downloaded binary archive
       when: install_method == "download"
       unarchive:
-        src: "{{ user_home }}/git/cardano-node-{{ cardano_node_version }}-linux.tar.gz"
-        dest: "{{ user_home }}/git/cardano-binary"
+        src: "{{ git_dir }}/cardano-node-{{ cardano_node_version }}-linux.tar.gz"
+        dest: "{{ git_dir }}/cardano-binary"
         remote_src: yes
 
     - name: Check if cardano service exists
@@ -82,8 +82,8 @@
       when: install_method == "download"
       become: yes
       shell: |
-        mv {{ user_home }}/git/cardano-binary/bin/cardano-node /usr/local/bin/
-        mv {{ user_home }}/git/cardano-binary/bin/cardano-cli /usr/local/bin/
+        mv {{ git_dir }}/cardano-binary/bin/cardano-node /usr/local/bin/
+        mv {{ git_dir }}/cardano-binary/bin/cardano-cli /usr/local/bin/
       args:
         executable: /bin/bash
         creates: /usr/local/bin/cardano-node
@@ -96,26 +96,26 @@
         - name: Clone cardano-node repository
           git:
             repo: https://github.com/IntersectMBO/cardano-node.git
-            dest: "{{ user_home }}/git/cardano-node"
+            dest: "{{ git_dir }}/cardano-node"
             clone: yes
             update: yes
 
         - name: Fetch all tags
           shell: git fetch --all --tags
           args:
-            chdir: "{{ user_home }}/git/cardano-node"
+            chdir: "{{ git_dir }}/cardano-node"
             executable: /bin/bash
 
         - name: Init and update submodules
           shell: git submodule update --init --recursive
           args:
-            chdir: "{{ user_home }}/git/cardano-node"
+            chdir: "{{ git_dir }}/cardano-node"
             executable: /bin/bash
 
         - name: Checkout specified cardano-node release tag
           shell: git checkout "{{ cardano_node_version }}"
           args:
-            chdir: "{{ user_home }}/git/cardano-node"
+            chdir: "{{ git_dir }}/cardano-node"
             executable: /bin/bash
 
         - name: Cabal update
@@ -123,7 +123,7 @@
             source {{ user_home }}/.ghcup/env
             cabal update
           args:
-            chdir: "{{ user_home }}/git/cardano-node"
+            chdir: "{{ git_dir }}/cardano-node"
             executable: /bin/bash
 
         - name: Cabal configure for build
@@ -131,7 +131,7 @@
             source {{ user_home }}/.ghcup/env
             cabal configure -O0 -w ghc-{{ ghc_version }}
           args:
-            chdir: "{{ user_home }}/git/cardano-node"
+            chdir: "{{ git_dir }}/cardano-node"
             executable: /bin/bash
 
         - name: Cabal build all
@@ -139,7 +139,7 @@
             source {{ user_home }}/.ghcup/env
             cabal build all
           args:
-            chdir: "{{ user_home }}/git/cardano-node"
+            chdir: "{{ git_dir }}/cardano-node"
             executable: /bin/bash
 
         - name: Cabal build cardano-cli
@@ -147,21 +147,21 @@
             source {{ user_home }}/.ghcup/env
             cabal build cardano-cli
           args:
-            chdir: "{{ user_home }}/git/cardano-node"
+            chdir: "{{ git_dir }}/cardano-node"
             executable: /bin/bash
 
         - name: Copy cardano-node binary to /usr/local/bin
           become: yes
           shell: cp -p "$(./scripts/bin-path.sh cardano-node)" /usr/local/bin/cardano-node
           args:
-            chdir: "{{ user_home }}/git/cardano-node"
+            chdir: "{{ git_dir }}/cardano-node"
             executable: /bin/bash
 
         - name: Copy cardano-cli binary to /usr/local/bin
           become: yes
           shell: cp -p "$(./scripts/bin-path.sh cardano-cli)" /usr/local/bin/cardano-cli
           args:
-            chdir: "{{ user_home }}/git/cardano-node"
+            chdir: "{{ git_dir }}/cardano-node"
             executable: /bin/bash
 
       when: install_method == "build"

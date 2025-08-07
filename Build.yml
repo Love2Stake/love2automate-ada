@@ -1,9 +1,0 @@
-- import_playbook: install-steps/01-Chrony_Setup.yml
-- import_playbook: install-steps/02-OS_Packages_Install.yml
-- import_playbook: install-steps/03-GHCup_Install.yml
-- import_playbook: install-steps/04-libsodium_Install.yml
-- import_playbook: install-steps/05-secp256k1_Install.yml
-- import_playbook: install-steps/06-blst_Install.yml
-- import_playbook: install-steps/07-Update_Env_File.yml
-- import_playbook: install-steps/08-Cardano_Node_Build.yml
-- import_playbook: install-steps/09-Create-Startup-Files.yml
