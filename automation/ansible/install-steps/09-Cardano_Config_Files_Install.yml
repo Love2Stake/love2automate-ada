@@ -6,14 +6,14 @@
   tasks:
     - name: Ensure cardano-my-node directory exists
       file:
-        path: "{{ user_home }}/cardano-my-node"
+        path: "{{ user_home }}/{{ cardano_node_dir }}"
         state: directory
         mode: '0755'
 
     - name: Download mainnet config.json
       get_url:
         url: "https://book.play.dev.cardano.org/environments/mainnet/config.json"
-        dest: "{{ user_home }}/cardano-my-node/config.json"
+        dest: "{{ user_home }}/{{ cardano_node_dir }}/config.json"
         mode: '0644'
         force: yes
 
@@ -25,68 +25,167 @@
 
     - name: Read config.json content
       slurp:
-        src: "{{ user_home }}/cardano-my-node/config.json"
+        src: "{{ user_home }}/{{ cardano_node_dir }}/config.json"
       register: config_content
 
     - name: Parse config.json
       set_fact:
         config_json: "{{ config_content.content | b64decode | from_json }}"
 
-    - name: Update defaultScribes in config.json
+    - name: Build log path for scribes
       set_fact:
-        updated_config: "{{ config_json | combine({'defaultScribes': [['FileSK', user_home + '/' + cardano_node_dir + '/logs/cardano-node.log'], ['StdoutSK', 'stdout']]}) }}"
+        log_path: "{{ user_home }}/{{ cardano_node_dir }}/logs/relay_log.json"
+
+    - name: Define overrides for config.json
+      set_fact:
+        config_overrides:
+          AlonzoGenesisFile: "alonzo-genesis.json"
+          AlonzoGenesisHash: "7e94a15f55d1e82d10f09203fa1d40f8eede58fd8066542cf6566008068ed874"
+          ByronGenesisFile: "byron-genesis.json"
+          ByronGenesisHash: "5f20df933584822601f9e3f8c024eb5eb252fe8cefb24d1317dc3d432e940ebb"
+          CheckpointsFile: "checkpoints.json"
+          CheckpointsFileHash: "3e6dee5bae7acc6d870187e72674b37c929be8c66e62a552cf6a876b1af31ade"
+          ConsensusMode: "PraosMode"
+          ConwayGenesisFile: "conway-genesis.json"
+          ConwayGenesisHash: "15a199f895e461ec0ffc6dd4e4028af28a492ab4e806d39cb674c88f7643ef62"
+          EnableP2P: true
+          LastKnownBlockVersion-Alt: 0
+          LastKnownBlockVersion-Major: 3
+          LastKnownBlockVersion-Minor: 0
+          LedgerDB:
+            Backend: "V2InMemory"
+            NumOfDiskSnapshots: 2
+            QueryBatchSize: 100000
+            SnapshotInterval: 4320
+          MaxKnownMajorProtocolVersion: 2
+          MinNodeVersion: "{{ cardano_node_version }}"
+          PeerSharing: true
+          Protocol: "Cardano"
+          RequiresNetworkMagic: "RequiresNoMagic"
+          ShelleyGenesisFile: "shelley-genesis.json"
+          ShelleyGenesisHash: "1a3be38bcbb7911969283716ad7aa550250226b76a61fc51cc9a9a35d9276d81"
+          TraceAcceptPolicy: true
+          TraceBlockFetchClient: false
+          TraceBlockFetchDecisions: false
+          TraceBlockFetchProtocol: false
+          TraceBlockFetchProtocolSerialised: false
+          TraceBlockFetchServer: false
+          TraceChainDb: true
+          TraceChainSyncBlockServer: false
+          TraceChainSyncClient: false
+          TraceChainSyncHeaderServer: false
+          TraceChainSyncProtocol: false
+          TraceConnectionManager: true
+          TraceDNSResolver: true
+          TraceDNSSubscription: true
+          TraceDiffusionInitialization: true
+          TraceErrorPolicy: true
+          TraceForge: true
+          TraceHandshake: true
+          TraceInboundGovernor: true
+          TraceIpSubscription: true
+          TraceLedgerPeers: true
+          TraceLocalChainSyncProtocol: false
+          TraceLocalConnectionManager: true
+          TraceLocalErrorPolicy: true
+          TraceLocalHandshake: true
+          TraceLocalRootPeers: true
+          TraceLocalTxSubmissionProtocol: false
+          TraceLocalTxSubmissionServer: false
+          TraceMempool: false
+          TraceMux: false
+          TracePeerSelection: true
+          TracePeerSelectionActions: true
+          TracePublicRootPeers: true
+          TraceServer: true
+          TraceTxInbound: false
+          TraceTxOutbound: false
+          TraceTxSubmissionProtocol: false
+          TracingVerbosity: "NormalVerbosity"
+          TurnOnLogMetrics: true
+          TurnOnLogging: true
+          UseTraceDispatcher: false
+          defaultBackends: ["KatipBK"]
+          defaultScribes:
+            - ["FileSK", "{{ log_path }}"]
+          hasEKG: 12788
+          hasPrometheus:
+            - "127.0.0.1"
+            - 12798
+          minSeverity: "Info"
+          options:
+            mapBackends:
+              cardano.node.metrics: ["EKGViewBK"]
+              cardano.node.resources: ["EKGViewBK"]
+            mapSubtrace:
+              cardano.node.metrics:
+                subtrace: "Neutral"
+          rotation:
+            rpKeepFilesNum: 10
+            rpLogLimitBytes: 50000000
+            rpMaxAgeHours: 24
+          setupBackends: ["KatipBK"]
+          setupScribes:
+            - scKind: "FileSK"
+              scName: "{{ log_path }}"
+              scFormat: "ScJson"
+              scRotation: null
+
+    - name: Merge overrides into downloaded config.json
+      set_fact:
+        updated_config: "{{ config_json | combine(config_overrides, recursive=True) }}"
 
     - name: Write updated config.json
       copy:
         content: "{{ updated_config | to_nice_json }}"
-        dest: "{{ user_home }}/cardano-my-node/config.json"
+        dest: "{{ user_home }}/{{ cardano_node_dir }}/config.json"
         mode: '0644'
 
     - name: Download mainnet byron-genesis.json
       get_url:
         url: "https://book.world.dev.cardano.org/environments/mainnet/byron-genesis.json"
-        dest: "{{ user_home }}/cardano-my-node/byron-genesis.json"
+        dest: "{{ user_home }}/{{ cardano_node_dir }}/byron-genesis.json"
         mode: '0644'
         force: yes
 
     - name: Download mainnet shelley-genesis.json
       get_url:
         url: "https://book.world.dev.cardano.org/environments/mainnet/shelley-genesis.json"
-        dest: "{{ user_home }}/cardano-my-node/shelley-genesis.json"
+        dest: "{{ user_home }}/{{ cardano_node_dir }}/shelley-genesis.json"
         mode: '0644'
         force: yes
 
     - name: Download mainnet alonzo-genesis.json
       get_url:
         url: "https://book.world.dev.cardano.org/environments/mainnet/alonzo-genesis.json"
-        dest: "{{ user_home }}/cardano-my-node/alonzo-genesis.json"
+        dest: "{{ user_home }}/{{ cardano_node_dir }}/alonzo-genesis.json"
         mode: '0644'
         force: yes
 
     - name: Download mainnet conway-genesis.json
       get_url:
         url: "https://book.world.dev.cardano.org/environments/mainnet/conway-genesis.json"
-        dest: "{{ user_home }}/cardano-my-node/conway-genesis.json"
+        dest: "{{ user_home }}/{{ cardano_node_dir }}/conway-genesis.json"
         mode: '0644'
         force: yes
 
     - name: Download mainnet topology.json
       get_url:
         url: "https://book.world.dev.cardano.org/environments/mainnet/topology.json"
-        dest: "{{ user_home }}/cardano-my-node/topology.json"
+        dest: "{{ user_home }}/{{ cardano_node_dir }}/topology.json"
         mode: '0644'
         force: yes
 
     - name: Download mainnet checkpoint.json
       get_url:
         url: "https://book.play.dev.cardano.org/environments/mainnet/checkpoints.json"
-        dest: "{{ user_home }}/cardano-my-node/checkpoints.json"
+        dest: "{{ user_home }}/{{ cardano_node_dir }}/checkpoints.json"
         mode: '0644'
         force: yes
 
     - name: List downloaded configuration files
       find:
-        paths: "{{ user_home }}/cardano-my-node"
+        paths: "{{ user_home }}/{{ cardano_node_dir }}"
         patterns: "*.json"
       register: config_files
 
@@ -97,7 +196,7 @@
 
     - name: Verify all configuration files exist
       stat:
-        path: "{{ user_home }}/cardano-my-node/{{ item }}"
+        path: "{{ user_home }}/{{ cardano_node_dir }}/{{ item }}"
       register: file_check
       loop:
         - config.json
@@ -115,7 +214,7 @@
 
     - name: Set file permissions for configuration files
       file:
-        path: "{{ user_home }}/cardano-my-node/{{ item }}"
+        path: "{{ user_home }}/{{ cardano_node_dir }}/{{ item }}"
         mode: '0644'
         owner: "{{ ansible_user_id }}"
         group: "{{ ansible_user_gid }}"
