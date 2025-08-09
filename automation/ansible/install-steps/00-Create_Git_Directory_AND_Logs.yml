@@ -8,9 +8,22 @@
       set_fact:
         unique_git_dir: "/tmp/git-{{ ansible_date_time.date }}-{{ ansible_date_time.time | replace(':', '') }}"
 
+    # Ensure Love2Automate logs are stored under the user's home directory
+    - name: Ensure Love2Automate base directory exists
+      file:
+        path: "{{ ansible_env.HOME }}/.love2automate-ada"
+        state: directory
+        mode: '0755'
+
+    - name: Ensure logs directory exists
+      file:
+        path: "{{ ansible_env.HOME }}/.love2automate-ada/logs"
+        state: directory
+        mode: '0755'
+
     - name: Generate unique log file name
       set_fact:
-        unique_log_file: "/tmp/ansible-install-{{ ansible_date_time.date }}-{{ ansible_date_time.time | replace(':', '') }}.log"
+        unique_log_file: "{{ ansible_env.HOME }}/.love2automate-ada/logs/ansible-install-{{ ansible_date_time.date }}-{{ ansible_date_time.time | replace(':', '') }}.log"
 
     - name: Create unique git working directory
       file:
