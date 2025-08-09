@@ -24,6 +24,7 @@
     - name: Generate unique log file name
       set_fact:
         unique_log_file: "{{ ansible_env.HOME }}/.love2automate-ada/logs/ansible-install-{{ ansible_date_time.date }}-{{ ansible_date_time.time | replace(':', '') }}.log"
+      when: unique_log_file is not defined
 
     - name: Create unique git working directory
       file:
