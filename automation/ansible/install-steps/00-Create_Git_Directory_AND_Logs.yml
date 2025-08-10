@@ -4,9 +4,14 @@
     - ../install_param.yml
 
   tasks:
+  
+    - name: Generate consistent timestamp for this run
+      set_fact:
+        run_timestamp: "{{ ansible_date_time.date }}-{{ ansible_date_time.time | replace(':', '') }}"
+
     - name: Generate unique git directory name
       set_fact:
-        unique_git_dir: "/tmp/git-{{ ansible_date_time.date }}-{{ ansible_date_time.time | replace(':', '') }}"
+        unique_git_dir: "/tmp/git-{{ run_timestamp }}"
 
     # Ensure Love2Automate logs are stored under the user's home directory
     - name: Ensure Love2Automate base directory exists
@@ -23,7 +28,7 @@
 
     - name: Generate unique log file name
       set_fact:
-        unique_log_file: "{{ ansible_env.HOME }}/.love2automate-ada/logs/ansible-install-{{ ansible_date_time.date }}-{{ ansible_date_time.time | replace(':', '') }}.log"
+        unique_log_file: "{{ ansible_env.HOME }}/.love2automate-ada/logs/ansible-install-{{ run_timestamp }}.log"
       when: unique_log_file is not defined
 
     - name: Create unique git working directory
