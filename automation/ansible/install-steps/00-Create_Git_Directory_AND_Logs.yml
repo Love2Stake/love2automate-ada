@@ -4,31 +4,55 @@
     - ../install_param.yml
 
   tasks:
+    - name: Generate consistent timestamp for this run
+      set_fact:
+        run_timestamp: "{{ ansible_date_time.date }}-{{ ansible_date_time.time | replace(':', '') }}"
+
     - name: Generate unique git directory name
       set_fact:
-        unique_git_dir: "/tmp/git-{{ ansible_date_time.date }}-{{ ansible_date_time.time | replace(':', '') }}"
+        unique_git_dir: "/tmp/git-{{ run_timestamp }}"
+
+    # Ensure Love2Automate logs are stored under the user's home directory
+    - name: Ensure Love2Automate base directory exists
+      file:
+        path: "{{ ansible_env.HOME }}/.love2automate-ada"
+        state: directory
+        mode: "0755"
+
+    - name: Ensure logs directory exists
+      file:
+        path: "{{ ansible_env.HOME }}/.love2automate-ada/logs"
+        state: directory
+        mode: "0755"
 
     - name: Generate unique log file name
       set_fact:
-        unique_log_file: "/tmp/ansible-install-{{ ansible_date_time.date }}-{{ ansible_date_time.time | replace(':', '') }}.log"
+        unique_log_file: "{{ ansible_env.HOME }}/.love2automate-ada/logs/ansible-install-{{ run_timestamp }}.log"
+      when: unique_log_file is not defined
 
     - name: Create unique git working directory
       file:
         path: "{{ unique_git_dir }}"
         state: directory
-        mode: '0755'
+        mode: "0755"
+
+    - name: Create unique ansible log file
+      file:
+        path: "{{ unique_log_file }}"
+        state: touch
+        mode: "0644"
 
     - name: Store git directory path for other playbooks (simple format)
       copy:
         content: "{{ unique_git_dir }}"
         dest: "/tmp/.git_build_dir"
-        mode: '0644'
+        mode: "0644"
 
     - name: Store log file path for other playbooks (simple format)
       copy:
         content: "{{ unique_log_file }}"
         dest: "/tmp/.log_file_path"
-        mode: '0644'
+        mode: "0644"
 
     - name: Set git_dir as a host fact for all subsequent playbooks
       set_fact:
